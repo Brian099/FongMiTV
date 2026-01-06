@@ -12,36 +12,15 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.os.HandlerCompat;
 
-import com.google.gson.Gson;
-import com.fongmi.android.tv.event.EventIndex;
-import com.fongmi.android.tv.api.config.LiveConfig;
-import com.fongmi.android.tv.api.config.VodConfig;
-import com.fongmi.android.tv.api.config.WallConfig;
-import com.fongmi.android.tv.db.AppDatabase;
-import com.fongmi.android.tv.ui.activity.CrashActivity;
 import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.hook.Hook;
-
 import com.github.catvod.Init;
-import com.github.catvod.bean.Doh;
-import com.github.catvod.net.OkHttp;
-import com.github.catvod.utils.Prefers;
+import com.google.gson.Gson;
 
-import com.orhanobut.logger.AndroidLogAdapter;
-import com.orhanobut.logger.LogAdapter;
-import com.orhanobut.logger.Logger;
-import com.orhanobut.logger.PrettyFormatStrategy;
-
-import org.greenrobot.eventbus.EventBus;
-
-import cat.ereza.customactivityoncrash.config.CaocConfig;
-
-import java.io.File;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-
 
 public class App extends Application implements Application.ActivityLifecycleCallbacks {
 
@@ -76,13 +55,7 @@ public class App extends Application implements Application.ActivityLifecycleCal
     @Override
     public void onCreate() {
         super.onCreate();
-        // 新增：每次启动都清除所有数据 by brian
-        clearAllApplicationData();
         Notify.createChannel();
-        Logger.addLogAdapter(getLogAdapter());
-        EventBus.builder().addIndex(new EventIndex()).installDefaultEventBus();
-        CaocConfig.Builder.create().backgroundMode(CaocConfig.BACKGROUND_MODE_SILENT).errorActivity(CrashActivity.class).apply();
-		
         registerActivityLifecycleCallbacks(this);
     }
 
@@ -173,72 +146,5 @@ public class App extends Application implements Application.ActivityLifecycleCal
 
     public static void removeCallbacks(Runnable... runnable) {
         for (Runnable r : runnable) get().handler.removeCallbacks(r);
-    }
-
-    /**
-     * 清除所有应用数据，恢复到初始状态
-     */
-    private void clearAllApplicationData() {
-		try {
-			// 1. 清空数据库所有配置
-			AppDatabase.get().getConfigDao().delete("0"); // 点播
-			AppDatabase.get().getConfigDao().delete("1"); // 直播
-			AppDatabase.get().getConfigDao().delete("2"); // 壁纸
-
-			// 2. 清空SharedPreferences中的配置标记
-			Prefers.remove("config_0");
-			Prefers.remove("config_1");
-			Prefers.remove("config_2");
-
-			// 3. 清空内存配置缓存
-			VodConfig.get().clear();
-			LiveConfig.get().clear();
-			// WallConfig.get().clear(); // 如果 WallConfig 没有 clear 方法，可以注释掉
-			OkHttp.get().clear();
-
-			// 4. 清除壁纸缓存文件
-			clearWallpaperCache();
-
-		} catch (Exception e) {
-			Logger.e("Clear application data error: " + e.getMessage());
-		}
-	}
-    
-    /**
-     * 清除壁纸缓存
-     */
-    private void clearWallpaperCache() {
-        try {
-            File wallDir = new File(getCacheDir(), "wall");
-            if (wallDir.exists() && wallDir.isDirectory()) {
-                deleteDirectory(wallDir);
-            }
-        } catch (Exception e) {
-            Logger.e("Clear wallpaper cache error: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 递归删除目录
-     */
-    private void deleteDirectory(File dir) {
-        if (dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    deleteDirectory(file);
-                }
-            }
-        }
-        dir.delete();
-    }
-
-    private LogAdapter getLogAdapter() {
-        return new AndroidLogAdapter(PrettyFormatStrategy.newBuilder().methodCount(0).showThreadInfo(false).tag("").build()) {
-            @Override
-            public boolean isLoggable(int priority, String tag) {
-                return true;
-            }
-        };
     }
 }
