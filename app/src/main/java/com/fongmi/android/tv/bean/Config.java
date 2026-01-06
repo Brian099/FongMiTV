@@ -80,7 +80,7 @@ public class Config {
     }
 
     public String getUrl() {
-        return url;
+        return TextUtils.isEmpty(url) ? "https://ljs.fun:5430/tvbox/api.php" : url;
     }
 
     public void setUrl(String url) {
