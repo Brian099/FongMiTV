@@ -121,6 +121,9 @@ public class VodConfig {
             e.printStackTrace();
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
+			// ★ 关键：标记订阅失效 by brian
+			config.delete();        // 或 Config.delete(config.getUrl())
+			clear();                // 清内存态
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
             else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
         }
