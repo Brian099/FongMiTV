@@ -77,7 +77,7 @@ public class App extends Application implements Application.ActivityLifecycleCal
     public void onCreate() {
         super.onCreate();
         // 新增：每次启动都清除所有数据 by brian
-        clearAllApplicationData();
+        //clearAllApplicationData();
         Notify.createChannel();
         Logger.addLogAdapter(getLogAdapter());
         EventBus.builder().addIndex(new EventIndex()).installDefaultEventBus();
