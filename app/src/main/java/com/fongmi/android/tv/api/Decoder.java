@@ -19,10 +19,37 @@ import okhttp3.HttpUrl;
 import okhttp3.Response;
 
 public class Decoder {
+	// 加上android_id，device_name引用 by brian
+	private static String addDeviceParams(String url) {
+		HttpUrl httpUrl = HttpUrl.parse(url);
+		if (httpUrl == null) return url;
+
+		HttpUrl.Builder builder = httpUrl.newBuilder();
+
+		if (httpUrl.queryParameter("android_id") == null) {
+			builder.addQueryParameter(
+				"android_id",
+				com.fongmi.android.tv.utils.Util.getAndroidId()
+			);
+		}
+
+		if (httpUrl.queryParameter("device_name") == null) {
+			builder.addQueryParameter(
+				"device_name",
+				com.fongmi.android.tv.utils.Util.getDeviceName()
+			);
+		}
+
+		return builder.build().toString();
+	}
+
 
     private static final Pattern JS_URI = Pattern.compile("\"(\\.|\\.\\.)/(.?|.+?)\\.js\\?(.?|.+?)\"");
 
     public static String getJson(String url, String tag) throws Exception {
+		// 追加设备参数 by brian
+        url = addDeviceParams(url);
+		
         try (Response res = OkHttp.newCall(url, tag).execute()) {
             HttpUrl httpUrl = res.request().url();
             int size = HttpUrl.parse(url).querySize();
