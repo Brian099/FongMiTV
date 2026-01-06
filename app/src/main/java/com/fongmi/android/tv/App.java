@@ -180,30 +180,30 @@ public class App extends Application implements Application.ActivityLifecycleCal
      * 清除所有应用数据，恢复到初始状态
      */
     private void clearAllApplicationData() {
-        try {
-            // 1. 清空数据库所有配置
-            AppDatabase.get().getConfigDao().delete(0); // 点播 type=0
-			AppDatabase.get().getConfigDao().delete(1); // 直播 type=1 
-			AppDatabase.get().getConfigDao().delete(2); // 壁纸 type=2
-            
-            // 2. 清空SharedPreferences中的配置标记
-            Prefers.remove("config_0"); // 点播
-            Prefers.remove("config_1"); // 直播
-            Prefers.remove("config_2"); // 壁纸
-            
-            // 3. 清空内存配置缓存
-            VodConfig.get().clear();
-            LiveConfig.get().clear();
-            WallConfig.get().clear();
-            OkHttp.get().clear();
-            
-            // 4. 清除壁纸缓存文件
-            clearWallpaperCache();
-            
-        } catch (Exception e) {
-            Logger.e("Clear application data error: " + e.getMessage());
-        }
-    }
+		try {
+			// 1. 清空数据库所有配置
+			AppDatabase.get().getConfigDao().delete("0"); // 点播
+			AppDatabase.get().getConfigDao().delete("1"); // 直播
+			AppDatabase.get().getConfigDao().delete("2"); // 壁纸
+
+			// 2. 清空SharedPreferences中的配置标记
+			Prefers.remove("config_0");
+			Prefers.remove("config_1");
+			Prefers.remove("config_2");
+
+			// 3. 清空内存配置缓存
+			VodConfig.get().clear();
+			LiveConfig.get().clear();
+			// WallConfig.get().clear(); // 如果 WallConfig 没有 clear 方法，可以注释掉
+			OkHttp.get().clear();
+
+			// 4. 清除壁纸缓存文件
+			clearWallpaperCache();
+
+		} catch (Exception e) {
+			Logger.e("Clear application data error: " + e.getMessage());
+		}
+	}
     
     /**
      * 清除壁纸缓存
