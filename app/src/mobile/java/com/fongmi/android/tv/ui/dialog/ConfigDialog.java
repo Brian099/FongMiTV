@@ -72,9 +72,9 @@ public class ConfigDialog {
 
     private void initView() {
         binding.name.setText(getConfig().getName());
-        binding.url.setText(ori = getConfig().getUrl());
+        binding.url.setText(maskUrlDomain(ori = config.getUrl()));
         binding.input.setVisibility(edit ? View.VISIBLE : View.GONE);
-        binding.url.setSelection(TextUtils.isEmpty(ori) ? 0 : ori.length());
+        binding.url.setSelection(TextUtils.isEmpty(ori) ? 0 : maskUrlDomain(ori).length());
     }
 
     private void initEvent() {
@@ -137,5 +137,17 @@ public class ConfigDialog {
 
     private void onNegative(DialogInterface dialog, int which) {
         dialog.dismiss();
+    }
+
+    // 将url中"//"和最后一个"/"之间的内容替换为一个*，协议和路径尾部保留 by brian
+    private String maskUrlDomain(String url) {
+        if (url == null) return "";
+        int idx = url.indexOf("//");
+        if (idx == -1) return url; // 没有协议部分
+        int lastSlash = url.lastIndexOf("/");
+        if (lastSlash <= idx + 1) return url; // 协议后没有路径
+        String protocol = url.substring(0, idx + 2); // http://
+        String suffix = url.substring(lastSlash);    // /bbb或/bbb.json
+        return protocol + "*" + suffix;
     }
 }
