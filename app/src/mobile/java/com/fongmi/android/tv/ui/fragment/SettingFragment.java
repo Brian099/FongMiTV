@@ -91,7 +91,8 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         EventBus.getDefault().register(this);
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
-        mBinding.wallUrl.setText(WallConfig.getDesc());
+        //mBinding.wallUrl.setText(WallConfig.getDesc());
+		mBinding.wallUrl.setText("点击按钮更换壁纸"); // 修改为固定文字 by brian
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
         setOtherText();
         setCacheText();
@@ -347,7 +348,8 @@ public class SettingFragment extends BaseFragment implements ConfigCallback, Sit
         if (event.getType() != RefreshEvent.Type.CONFIG) return;
         mBinding.vodUrl.setText(VodConfig.getDesc());
         mBinding.liveUrl.setText(LiveConfig.getDesc());
-        mBinding.wallUrl.setText(WallConfig.getDesc());
+        //mBinding.wallUrl.setText(WallConfig.getDesc());
+		mBinding.wallUrl.setText("点击按钮更换壁纸"); // 修改为固定文字 by brian
     }
 
     @Override
