@@ -1,0 +1,75 @@
+name: Android CI with Signing
+
+on:
+  push:
+    branches: [ "release" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-sign:
+    runs-on: ubuntu-latest
+
+    # 在这里设置环境变量，确保所有步骤都能访问
+    env:
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+        
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+        
+    - name: Decode Keystore
+      run: |
+        mkdir -p app/
+        echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > app/my-release-key.keystore
+        echo "Keystore file created"
+        ls -la app/my-release-key.keystore
+        
+    - name: Verify Keystore
+      run: |
+        # 验证keystore文件是否存在且可访问
+        if [ -f "app/my-release-key.keystore" ]; then
+          echo "Keystore file exists"
+        else
+          echo "ERROR: Keystore file not found!"
+          exit 1
+        fi
+        
+    - name: Build signed Release APK
+      run: |
+        # 打印环境变量用于调试
+        echo "KEYSTORE_PASSWORD: ${KEYSTORE_PASSWORD:0:2}******"  # 只显示前2位
+        echo "KEY_ALIAS: $KEY_ALIAS"
+        echo "KEY_PASSWORD: ${KEY_PASSWORD:0:2}******"  # 只显示前2位
+        
+        # 构建命令
+        ./gradlew assembleRelease -x lint --info
+        
+    - name: List generated APKs
+      run: |
+        find . -name "*.apk" -type f -exec ls -la {} \;
+        
+    # 上传签名的APK
+    - name: Upload signed APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: signed-release-apk
+        path: ./**/*.apk
+        if-no-files-found: error
+        

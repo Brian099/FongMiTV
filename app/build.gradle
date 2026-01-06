@@ -24,7 +24,16 @@ android {
             }
         }
     }
-
+	
+    // 添加签名配置
+    signingConfigs {
+        release {
+            storeFile file('my-release-key.keystore')
+            storePassword System.getenv('KEYSTORE_PASSWORD')
+            keyAlias System.getenv('KEY_ALIAS')
+            keyPassword System.getenv('KEY_PASSWORD')
+        }
+    }
     flavorDimensions = ["mode", "abi"]
 
     productFlavors {
@@ -51,6 +60,8 @@ android {
 
     buildTypes {
         release {
+            // 启用签名配置
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
