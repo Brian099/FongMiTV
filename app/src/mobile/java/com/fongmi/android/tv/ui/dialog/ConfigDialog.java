@@ -70,12 +70,16 @@ public class ConfigDialog {
         dialog.show();
     }
 
-    private void initView() {
-        binding.name.setText(getConfig().getName());
-        binding.url.setText(maskUrlDomain(ori = config.getUrl()));
-        binding.input.setVisibility(edit ? View.VISIBLE : View.GONE);
-        binding.url.setSelection(TextUtils.isEmpty(ori) ? 0 : maskUrlDomain(ori).length());
-    }
+	private void initView() {
+		Config config = getConfig();
+		binding.name.setText(config != null ? config.getName() : "");
+		// 修改ori的定义方法 by brian
+		ori = config != null ? config.getUrl() : "";
+		binding.url.setText(maskUrlDomain(ori));
+		binding.input.setVisibility(edit ? View.VISIBLE : View.GONE);
+		binding.url.setSelection(TextUtils.isEmpty(ori) ? 0 : maskUrlDomain(ori).length());
+	}
+
 
     private void initEvent() {
         binding.choose.setEndIconOnClickListener(this::onChoose);
