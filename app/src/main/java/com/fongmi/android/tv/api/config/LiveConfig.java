@@ -127,41 +127,39 @@ public class LiveConfig {
         callback.start();
     }
 
-    private void loadConfig(int id, Config config, Callback callback) {
-        try {
-            OkHttp.cancel(TAG);
-            Server.get().start();
-            String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
-            if (Json.isObj(json)) checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-            else parseText(id, config, callback, json);
-            if (taskId.get() == id && config.equals(this.config)) config.update();
-        } catch (Throwable e) {
-            e.printStackTrace();
-            if (isCanceled(e)) return;
-            if (taskId.get() != id) return;
-            // ★ 关键：标记订阅失效 by brian
-            config.delete();        // 删除多仓地址
-            clear();                // 清内存态
-            // ★ 弹出提示 + UI回调
-            App.post(() -> {
-                String msg = TextUtils.isEmpty(config.getUrl())
-                        ? "配置地址为空或错误"
-                        : Notify.getError(R.string.error_config_get, e);
+	private void loadConfig(int id, Config config, Callback callback) {
+		try {
+			OkHttp.cancel(TAG);
+			Server.get().start();
+			String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
 
-                new AlertDialog.Builder(App.activity())
-                    .setTitle("加载失败")
-                    .setMessage(msg)
-                    .setCancelable(false)
-                    .setPositiveButton("重试", (dialog, which) -> {
-                        VodConfig.load(config, callback);  // 重新加载
-                    })
-                    .setNegativeButton("退出", (dialog, which) -> {
-                        if (App.activity() != null) App.activity().finishAffinity(); // 退出 App
-                    })
-                    .show();
-            });
-        }
-    }
+			if (Json.isObj(json)) {
+				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
+			} else {
+				parseText(id, config, callback, json);
+			}
+
+			// 成功拉到多仓，更新缓存
+			if (taskId.get() == id && config.equals(this.config)) config.update();
+
+		} catch (Throwable e) {
+			e.printStackTrace();
+			if (isCanceled(e)) return;
+			if (taskId.get() != id) return;
+
+			// ★ 多仓接口失败 → 直接清空缓存
+			config.delete();    // 删除原有多仓/单仓
+			clear();
+
+			App.post(() -> {
+				String msg = TextUtils.isEmpty(config.getUrl())
+						? "配置地址为空或错误"
+						: Notify.getError(R.string.error_config_get, e);
+				Notify.show(msg);       // 弹窗提示
+				callback.error(msg);    // 停止加载状态
+			});
+		}
+	}
 
     private void parseText(int id, Config config, Callback callback, String text) {
         Live live = new Live(parseName(config.getUrl()), config.getUrl()).sync();
@@ -188,16 +186,26 @@ public class LiveConfig {
         }
     }
 
-    private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
-        List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        List<Config> configs = new ArrayList<>();
-        // 禁止单仓入库 by brian
-        // for (Depot item : items) configs.add(Config.find(item, 1));
-        for (Depot item : items) configs.add(Config.temp(item));
-        loadConfig(id, this.config = configs.get(0), callback);
-        // 启动时每次都解析多仓 by brian
-        //Config.delete(config.getUrl());
-    }
+	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
+		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
+		if (items.isEmpty()) {
+			// 多仓为空 → 直接失败
+			App.post(() -> {
+				String msg = "多仓接口返回为空";
+				Notify.show(msg);
+				callback.error(msg);
+			});
+			return;
+		}
+
+		// 多仓成功 → 删除原单仓，重新解析
+		Config.delete(config.getUrl(), config.getType());
+
+		List<Config> configs = new ArrayList<>();
+		for (Depot item : items) configs.add(Config.find(item, 1)); // 1 = 多仓类型live
+		loadConfig(id, this.config = configs.get(0), callback);
+	}
+
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
         try {
