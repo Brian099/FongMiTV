@@ -116,13 +116,13 @@ public class VodConfig {
             Server.get().start();
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
+
+            // ⭐ 如果非子仓，更新数据库
             if (taskId.get() == id && config.equals(this.config) && !config.isFromDepot()) {
                 config.update();
             }
         } catch (Throwable e) {
             e.printStackTrace();
-            // ⭐ 拉取失败也删除旧子仓
-            Config.deleteByType(0);
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
@@ -142,16 +142,12 @@ public class VodConfig {
 
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        if (items.isEmpty()) {
-            Config.deleteByType(0);
-            App.post(() -> callback.error("多仓为空"));
-            return;
-        }
-        // ⭐ 删除旧子仓，覆盖式更新
-        Config.deleteByType(0);
         List<Config> configs = new ArrayList<>();
-        for (Depot item : items) configs.add(Config.createFromDepot(item).insert());
-        loadConfig(id, this.config = configs.get(0), callback);
+        // ⭐ 删除旧子仓
+        Config.deleteByType(0);
+        for (Depot item : items) configs.add(Config.createFromDepot(item));
+        // 使用第一个仓加载
+        if (!configs.isEmpty()) loadConfig(id, this.config = configs.get(0), callback);
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -165,7 +161,6 @@ public class VodConfig {
             String notice = Json.safeString(object, "notice");
             if (taskId.get() != id) return;
             App.post(() -> callback.success(notice));
-            App.post(callback::success);
         } catch (Throwable e) {
             e.printStackTrace();
             if (taskId.get() != id) return;
@@ -216,13 +211,9 @@ public class VodConfig {
         return sites == null ? Collections.emptyList() : sites;
     }
 
-    private void setSites(List<Site> sites) {
-        this.sites = sites;
-    }
+    private void setSites(List<Site> sites) { this.sites = sites; }
 
-    public List<Parse> getParses() {
-        return parses == null ? Collections.emptyList() : parses;
-    }
+    public List<Parse> getParses() { return parses == null ? Collections.emptyList() : parses; }
 
     private void setParses(List<Parse> parses) {
         if (!parses.isEmpty()) parses.add(0, Parse.god());
@@ -237,74 +228,42 @@ public class VodConfig {
         return items;
     }
 
-    private void setDoh(List<Doh> doh) {
-        this.doh = doh;
-    }
+    private void setDoh(List<Doh> doh) { this.doh = doh; }
 
-    public List<Rule> getRules() {
-        return rules == null ? Collections.emptyList() : rules;
-    }
+    public List<Rule> getRules() { return rules == null ? Collections.emptyList() : rules; }
 
-    private void setRules(List<Rule> rules) {
-        this.rules = rules;
-    }
+    private void setRules(List<Rule> rules) { this.rules = rules; }
 
-    private void setHeaders(List<Header> headers) {
-        OkHttp.responseInterceptor().addAll(headers);
-    }
+    private void setHeaders(List<Header> headers) { OkHttp.responseInterceptor().addAll(headers); }
 
     private void setProxy(List<Proxy> proxy) {
         OkHttp.authenticator().addAll(proxy);
         OkHttp.selector().addAll(proxy);
     }
 
-    public List<String> getFlags() {
-        return flags == null ? Collections.emptyList() : flags;
-    }
+    public List<String> getFlags() { return flags == null ? Collections.emptyList() : flags; }
 
-    private void setFlags(List<String> flags) {
-        this.flags = flags;
-    }
+    private void setFlags(List<String> flags) { this.flags = flags; }
 
-    private void setHosts(List<String> hosts) {
-        OkHttp.dns().addAll(hosts);
-    }
+    private void setHosts(List<String> hosts) { OkHttp.dns().addAll(hosts); }
 
-    public List<String> getAds() {
-        return ads == null ? Collections.emptyList() : ads;
-    }
+    public List<String> getAds() { return ads == null ? Collections.emptyList() : ads; }
 
-    private void setAds(List<String> ads) {
-        this.ads = ads;
-    }
+    private void setAds(List<String> ads) { this.ads = ads; }
 
-    public Config getConfig() {
-        return config == null ? Config.vod() : config;
-    }
+    public Config getConfig() { return config == null ? Config.vod() : config; }
 
-    public Parse getParse() {
-        return parse == null ? new Parse() : parse;
-    }
+    public Parse getParse() { return parse == null ? new Parse() : parse; }
 
-    public Site getHome() {
-        return home == null ? new Site() : home;
-    }
+    public Site getHome() { return home == null ? new Site() : home; }
 
-    public String getWall() {
-        return TextUtils.isEmpty(wall) ? "" : wall;
-    }
+    public String getWall() { return TextUtils.isEmpty(wall) ? "" : wall; }
 
-    public Parse getParse(String name) {
-        return getParses().stream().filter(item -> item.getName().equals(name)).findFirst().orElse(new Parse());
-    }
+    public Parse getParse(String name) { return getParses().stream().filter(item -> item.getName().equals(name)).findFirst().orElse(new Parse()); }
 
-    public Site getSite(String key) {
-        return getSites().stream().filter(item -> item.getKey().equals(key)).findFirst().orElse(new Site());
-    }
+    public Site getSite(String key) { return getSites().stream().filter(item -> item.getKey().equals(key)).findFirst().orElse(new Site()); }
 
-    public void setParse(Parse parse) {
-        setParse(getConfig(), parse, true);
-    }
+    public void setParse(Parse parse) { setParse(getConfig(), parse, true); }
 
     private void setParse(Config config, Parse parse, boolean save) {
         this.parse = parse;
@@ -314,9 +273,7 @@ public class VodConfig {
         if (save) config.save();
     }
 
-    public void setHome(Site site) {
-        setHome(getConfig(), site, true);
-    }
+    public void setHome(Site site) { setHome(getConfig(), site, true); }
 
     private void setHome(Config config, Site site, boolean save) {
         home = site;

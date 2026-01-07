@@ -56,45 +56,27 @@ public class LiveConfig {
         static volatile LiveConfig INSTANCE = new LiveConfig();
     }
 
-    public static LiveConfig get() {
-        return Loader.INSTANCE;
-    }
+    public static LiveConfig get() { return Loader.INSTANCE; }
 
-    public static String getUrl() {
-        return get().getConfig().getUrl();
-    }
+    public static String getUrl() { return get().getConfig().getUrl(); }
 
-    public static String getDesc() {
-        return get().getConfig().getDesc();
-    }
+    public static String getDesc() { return get().getConfig().getDesc(); }
 
-    public static String getResp() {
-        return get().getHome().getCore().getResp();
-    }
+    public static String getResp() { return get().getHome().getCore().getResp(); }
 
-    public static int getHomeIndex() {
-        return get().getLives().indexOf(get().getHome());
-    }
+    public static int getHomeIndex() { return get().getLives().indexOf(get().getHome()); }
 
-    public static boolean isOnly() {
-        return get().getLives().size() == 1;
-    }
+    public static boolean isOnly() { return get().getLives().size() == 1; }
 
-    public static boolean isEmpty() {
-        return get().getHome().isEmpty();
-    }
+    public static boolean isEmpty() { return get().getHome().isEmpty(); }
 
-    public static boolean hasUrl() {
-        return getUrl() != null && !getUrl().isEmpty();
-    }
+    public static boolean hasUrl() { return getUrl() != null && !getUrl().isEmpty(); }
 
     public static void load(Config config, Callback callback) {
         get().clear().config(config).load(callback);
     }
 
-    public LiveConfig init() {
-        return config(Config.live());
-    }
+    public LiveConfig init() { return config(Config.live()); }
 
     public LiveConfig config(Config config) {
         this.config = config;
@@ -132,11 +114,14 @@ public class LiveConfig {
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             if (Json.isObj(json)) checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
             else parseText(id, config, callback, json);
-            if (taskId.get() == id && config.equals(this.config)) config.update();
+
+            // ⭐ 更新数据库
+            if (taskId.get() == id && config.equals(this.config) && !config.isFromDepot()) {
+                config.update();
+            }
+
         } catch (Throwable e) {
             e.printStackTrace();
-            // ⭐ 拉取失败删除旧子仓
-            Config.deleteByType(1);
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
@@ -171,16 +156,15 @@ public class LiveConfig {
 
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        if (items.isEmpty()) {
-            Config.deleteByType(1);
-            App.post(() -> callback.error("多仓为空"));
-            return;
-        }
-        // ⭐ 删除旧子仓，覆盖式更新
-        Config.deleteByType(1);
         List<Config> configs = new ArrayList<>();
-        for (Depot item : items) configs.add(Config.createFromDepot(item).insert());
-        loadConfig(id, this.config = configs.get(0), callback);
+
+        // ⭐ 删除旧子仓
+        Config.deleteByType(1);
+
+        for (Depot item : items) configs.add(Config.createFromDepot(item));
+
+        // 使用第一个仓加载
+        if (!configs.isEmpty()) loadConfig(id, this.config = configs.get(0), callback);
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -267,54 +251,32 @@ public class LiveConfig {
         return lives == null ? lives = new ArrayList<>() : lives;
     }
 
-    private void setLives(List<Live> lives) {
-        this.lives = lives;
-    }
+    private void setLives(List<Live> lives) { this.lives = lives; }
 
-    public List<Rule> getRules() {
-        return rules == null ? Collections.emptyList() : rules;
-    }
+    public List<Rule> getRules() { return rules == null ? Collections.emptyList() : rules; }
 
-    private void setRules(List<Rule> rules) {
-        this.rules = rules;
-    }
+    private void setRules(List<Rule> rules) { this.rules = rules; }
 
-    private void setHeaders(List<Header> headers) {
-        OkHttp.responseInterceptor().addAll(headers);
-    }
+    private void setHeaders(List<Header> headers) { OkHttp.responseInterceptor().addAll(headers); }
 
     private void setProxy(List<Proxy> proxy) {
         OkHttp.authenticator().addAll(proxy);
         OkHttp.selector().addAll(proxy);
     }
 
-    private void setHosts(List<String> hosts) {
-        OkHttp.dns().addAll(hosts);
-    }
+    private void setHosts(List<String> hosts) { OkHttp.dns().addAll(hosts); }
 
-    public List<String> getAds() {
-        return ads == null ? Collections.emptyList() : ads;
-    }
+    public List<String> getAds() { return ads == null ? Collections.emptyList() : ads; }
 
-    private void setAds(List<String> ads) {
-        this.ads = ads;
-    }
+    private void setAds(List<String> ads) { this.ads = ads; }
 
-    public Config getConfig() {
-        return config == null ? Config.live() : config;
-    }
+    public Config getConfig() { return config == null ? Config.live() : config; }
 
-    public Live getHome() {
-        return home == null ? new Live() : home;
-    }
+    public Live getHome() { return home == null ? new Live() : home; }
 
-    public Live getLive(String key) {
-        return getLives().stream().filter(item -> item.getName().equals(key)).findFirst().orElse(new Live());
-    }
+    public Live getLive(String key) { return getLives().stream().filter(item -> item.getName().equals(key)).findFirst().orElse(new Live()); }
 
-    public void setHome(Live home) {
-        setHome(getConfig(), home, true);
-    }
+    public void setHome(Live home) { setHome(getConfig(), home, true); }
 
     private void setHome(Config config, Live live, boolean save) {
         home = live;
