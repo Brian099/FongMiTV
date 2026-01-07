@@ -52,12 +52,26 @@ public class App extends Application implements Application.ActivityLifecycleCal
         Init.set(base);
     }
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        Notify.createChannel();
-        registerActivityLifecycleCallbacks(this);
-    }
+	// app启动时强制拉取多仓，拉取失败直接闪退
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		Notify.createChannel();
+		registerActivityLifecycleCallbacks(this);
+
+		try {
+			// ----------- 阻塞加载 VOD 多仓 -----------------
+			VodConfig.get().loadSync();
+		} catch (Throwable e) {
+			e.printStackTrace();
+			// VOD 多仓拉取失败，直接闪退
+			System.exit(1);
+		}
+
+		// VOD 成功后，异步加载 Live 多仓
+		LiveConfig.get().load();
+	}
+
 
     @Override
     public PackageManager getPackageManager() {
