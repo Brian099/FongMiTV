@@ -172,7 +172,16 @@ public class VodConfig {
 		loadConfig(id, this.config = configs.get(0), callback);
 	}
 
-
+    private void checkJson(int id, Config config, Callback callback, JsonObject object) {
+        if (object.has("msg")) {
+            App.post(() -> callback.error(object.get("msg").getAsString()));
+        } else if (object.has("urls")) {
+            parseDepot(id, config, callback, object);
+        } else {
+            parseConfig(id, config, callback, object);
+        }
+    }
+	
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
         try {
             initList(object);
