@@ -50,6 +50,8 @@ public class LiveConfig {
     private List<Rule> rules;
     private List<String> ads;
     private Future<?> future;
+
+    // 是否同步状态（VodConfig 多仓 URL 与 LiveConfig URL 一致）
     private boolean sync;
 
     private static class Loader {
@@ -99,7 +101,7 @@ public class LiveConfig {
     public LiveConfig config(Config config) {
         this.config = config;
         if (config.isEmpty()) return this;
-        this.sync = config.getUrl().equals(VodConfig.getUrl());
+        this.sync = config.getUrl().equals(com.fongmi.android.tv.api.config.VodConfig.getUrl());
         return this;
     }
 
@@ -113,9 +115,14 @@ public class LiveConfig {
         return "Canceled".equals(e.getMessage()) || e instanceof InterruptedException || e instanceof InterruptedIOException;
     }
 
-    public void load() {
-        if (sync) return;
+    // 强制拉取多仓
+    public void load(boolean force) {
+        if (!force && sync) return;
         load(new Callback());
+    }
+
+    public void load() {
+        load(false);
     }
 
     public void load(Callback callback) {
@@ -130,9 +137,17 @@ public class LiveConfig {
             OkHttp.cancel(TAG);
             Server.get().start();
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
-            if (Json.isObj(json)) checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-            else parseText(id, config, callback, json);
-            if (taskId.get() == id && config.equals(this.config)) config.update();
+            if (Json.isObj(json)) {
+                checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
+            } else {
+                parseText(id, config, callback, json);
+            }
+
+            // ⚠️ 只有非运行态才落库
+            if (!config.isRuntime() && taskId.get() == id && config.equals(this.config)) {
+                config.update();
+            }
+
         } catch (Throwable e) {
             e.printStackTrace();
             if (isCanceled(e)) return;
@@ -170,9 +185,15 @@ public class LiveConfig {
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
         List<Config> configs = new ArrayList<>();
-        for (Depot item : items) configs.add(Config.find(item, 1));
+        for (Depot item : items) {
+            // ⚠️ 设置运行态，不落库
+            configs.add(Config.find(item, 1).setRuntime(true));
+        }
+        // 使用第一个子仓作为运行态 Config
         loadConfig(id, this.config = configs.get(0), callback);
-        Config.delete(config.getUrl());
+
+        // ⚠️ 保留多仓 URL，不删除数据库
+        // Config.delete(config.getUrl());
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -252,7 +273,7 @@ public class LiveConfig {
     }
 
     public boolean needSync(String url) {
-        return sync || TextUtils.isEmpty(config.getUrl()) || url.equals(config.getUrl());
+        return true; // ⚠️ 每次启动都拉取多仓
     }
 
     public List<Live> getLives() {
@@ -309,10 +330,10 @@ public class LiveConfig {
     }
 
     private void setHome(Config config, Live live, boolean save) {
-        home = live;
+        this.home = live;
         home.setActivated(true);
         config.home(home.getName());
-        if (save) config.save();
+        if (save && !config.isRuntime()) config.save();
         getLives().forEach(item -> item.setActivated(home));
         if (App.activity() != null && App.activity() instanceof LiveActivity) return;
         if (!save && (home.isBoot() || Setting.isBootLive())) App.post(this::bootLive);

@@ -40,6 +40,18 @@ public class Config {
     private String home;
     @SerializedName("parse")
     private String parse;
+	
+	// 表示运行态的 Config，不落库
+	private transient boolean runtime = false;
+
+	public boolean isRuntime() {
+		return runtime;
+	}
+
+	public Config setRuntime(boolean runtime) {
+		this.runtime = runtime;
+		return this;
+	}
 
     public static List<Config> arrayFrom(String str) {
         Type listType = new TypeToken<List<Config>>() {}.getType();
