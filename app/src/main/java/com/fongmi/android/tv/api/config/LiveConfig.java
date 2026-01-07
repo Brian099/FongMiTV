@@ -173,8 +173,8 @@ public class LiveConfig {
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
         List<Config> configs = new ArrayList<>();
-		// 禁止单仓入库 by brian
-        // for (Depot item : items) configs.add(Config.find(item, 0));
+        // 禁止单仓入库 by brian
+        // for (Depot item : items) configs.add(Config.find(item, 1));
 		for (Depot item : items) configs.add(Config.temp(item));
         loadConfig(id, this.config = configs.get(0), callback);
         // 启动时每次都解析多仓 by brian
