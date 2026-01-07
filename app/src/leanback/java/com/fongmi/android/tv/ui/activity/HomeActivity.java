@@ -190,7 +190,8 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void initConfig() {
-        VodConfig.get().init().load(getCallback());
+		// by brian
+        VodConfig.get().init().strictBoot(true).load(getCallback());
         LiveConfig.get().init().load();
         WallConfig.get().init();
     }
