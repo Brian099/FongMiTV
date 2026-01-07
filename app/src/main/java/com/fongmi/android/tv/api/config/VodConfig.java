@@ -48,8 +48,6 @@ public class VodConfig {
     private List<String> flags;
     private List<Parse> parses;
     private Future<?> future;
-	// by brian
-	private boolean strictBoot = false;
 
     private static class Loader {
         static volatile VodConfig INSTANCE = new VodConfig();
@@ -82,11 +80,6 @@ public class VodConfig {
     public static void load(Config config, Callback callback) {
         get().clear().config(config).load(callback);
     }
-	// by brian
-	public VodConfig strictBoot(boolean enable) {
-		this.strictBoot = enable;
-		return this;
-	}
 
     public VodConfig init() {
         return config(Config.vod());
@@ -132,25 +125,16 @@ public class VodConfig {
             else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
         }
     }
-	//by brian
-	private void checkJson(int id, Config config, Callback callback, JsonObject object) {
-		// 严格启动：必须是多仓
-		if (strictBoot) {
-			if (!object.has("urls") || !object.get("urls").isJsonArray()) {
-				App.post(() -> callback.error("多仓数据无效，应用无法启动"));
-				return;
-			}
-		}
 
-		if (object.has("msg")) {
-			App.post(() -> callback.error(object.get("msg").getAsString()));
-		} else if (object.has("urls")) {
-			parseDepot(id, config, callback, object);
-		} else {
-			parseConfig(id, config, callback, object);
-		}
-	}
-
+    private void checkJson(int id, Config config, Callback callback, JsonObject object) {
+        if (object.has("msg")) {
+            App.post(() -> callback.error(object.get("msg").getAsString()));
+        } else if (object.has("urls")) {
+            parseDepot(id, config, callback, object);
+        } else {
+            parseConfig(id, config, callback, object);
+        }
+    }
 
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
