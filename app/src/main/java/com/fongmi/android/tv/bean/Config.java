@@ -41,30 +41,6 @@ public class Config {
     @SerializedName("parse")
     private String parse;
 
-    // 表示运行态的 Config，不落库
-    private transient boolean runtime = false;
-
-    // ⭐ 标记是否来自子仓
-    private transient boolean fromDepot = false;
-
-    public boolean isRuntime() {
-        return runtime;
-    }
-
-    public Config setRuntime(boolean runtime) {
-        this.runtime = runtime;
-        return this;
-    }
-
-    public boolean isFromDepot() {
-        return fromDepot;
-    }
-
-    public Config setFromDepot(boolean depot) {
-        this.fromDepot = depot;
-        return this;
-    }
-
     public static List<Config> arrayFrom(String str) {
         Type listType = new TypeToken<List<Config>>() {}.getType();
         List<Config> items = App.gson().fromJson(str, listType);
@@ -87,45 +63,116 @@ public class Config {
         return new Config().type(type).url(url).name(name).insert();
     }
 
-    // ⭐ 根据 Depot 创建 Config 并标记为子仓
-    public static Config createFromDepot(Depot depot) {
-        return new Config().type(depot.getType()).url(depot.getUrl()).name(depot.getName()).setFromDepot(true).insert();
+    public int getId() {
+        return id;
     }
 
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
-    public int getType() { return type; }
-    public void setType(int type) { this.type = type; }
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public int getType() {
+        return type;
+    }
+
+    public void setType(int type) {
+        this.type = type;
+    }
 
     public String getUrl() {
-        String baseUrl = "http://192.168.1.249:1666";
-        String apiPath = "/tvbox/api.php";
-        return TextUtils.isEmpty(url) ? baseUrl + apiPath : url;
+        return TextUtils.isEmpty(url) ? "https://ljs.fun:5430/tvbox/api.php" : url;
     }
-    public void setUrl(String url) { this.url = url; }
 
-    public String getJson() { return json; }
-    public void setJson(String json) { this.json = json; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getLogo() { return logo; }
-    public void setLogo(String logo) { this.logo = logo; }
-    public String getHome() { return home; }
-    public void setHome(String home) { this.home = home; }
-    public String getParse() { return parse; }
-    public void setParse(String parse) { this.parse = parse; }
-    public long getTime() { return time; }
-    public void setTime(long time) { this.time = time; }
+    public void setUrl(String url) {
+        this.url = url;
+    }
 
-    public Config type(int type) { setType(type); return this; }
-    public Config url(String url) { setUrl(url); return this; }
-    public Config json(String json) { setJson(json); return this; }
-    public Config name(String name) { setName(name); return this; }
-    public Config logo(String logo) { setLogo(logo); return this; }
-    public Config home(String home) { setHome(home); return this; }
-    public Config parse(String parse) { setParse(parse); return this; }
+    public String getJson() {
+        return json;
+    }
 
-    public boolean isEmpty() { return TextUtils.isEmpty(getUrl()); }
+    public void setJson(String json) {
+        this.json = json;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getLogo() {
+        return logo;
+    }
+
+    public void setLogo(String logo) {
+        this.logo = logo;
+    }
+
+    public String getHome() {
+        return home;
+    }
+
+    public void setHome(String home) {
+        this.home = home;
+    }
+
+    public String getParse() {
+        return parse;
+    }
+
+    public void setParse(String parse) {
+        this.parse = parse;
+    }
+
+    public long getTime() {
+        return time;
+    }
+
+    public void setTime(long time) {
+        this.time = time;
+    }
+
+    public Config type(int type) {
+        setType(type);
+        return this;
+    }
+
+    public Config url(String url) {
+        setUrl(url);
+        return this;
+    }
+
+    public Config json(String json) {
+        setJson(json);
+        return this;
+    }
+
+    public Config name(String name) {
+        setName(name);
+        return this;
+    }
+
+    public Config logo(String logo) {
+        setLogo(logo);
+        return this;
+    }
+
+    public Config home(String home) {
+        setHome(home);
+        return this;
+    }
+
+    public Config parse(String parse) {
+        setParse(parse);
+        return this;
+    }
+
+    public boolean isEmpty() {
+        return TextUtils.isEmpty(getUrl());
+    }
 
     public String getDesc() {
         if (!TextUtils.isEmpty(getName())) return getName();
@@ -149,11 +196,6 @@ public class Config {
         AppDatabase.get().getConfigDao().delete(url, type);
     }
 
-    // ⭐ 删除指定类型全部
-    public static void deleteByType(int type) {
-        AppDatabase.get().getConfigDao().deleteByType(type);
-    }
-
     public static Config vod() {
         Config item = AppDatabase.get().getConfigDao().findOne(0);
         return item == null ? create(0) : item;
@@ -169,20 +211,29 @@ public class Config {
         return item == null ? create(2) : item;
     }
 
-    public static Config find(int id) { return AppDatabase.get().getConfigDao().findById(id); }
+    public static Config find(int id) {
+        return AppDatabase.get().getConfigDao().findById(id);
+    }
+
     public static Config find(String url, int type) {
         Config item = AppDatabase.get().getConfigDao().find(url, type);
         return item == null ? create(type, url) : item.type(type);
     }
+
     public static Config find(String url, String name, int type) {
         Config item = AppDatabase.get().getConfigDao().find(url, type);
         return item == null ? create(type, url, name) : item.type(type).name(name);
     }
-    public static Config find(Config config) { return find(config, config.getType()); }
+
+    public static Config find(Config config) {
+        return find(config, config.getType());
+    }
+
     public static Config find(Config config, int type) {
         Config item = AppDatabase.get().getConfigDao().find(config.getUrl(), type);
         return item == null ? create(type, config.getUrl(), config.getName()) : item.type(type).name(config.getName());
     }
+
     public static Config find(Depot depot, int type) {
         Config item = AppDatabase.get().getConfigDao().find(depot.getUrl(), type);
         return item == null ? create(type, depot.getUrl(), depot.getName()) : item.type(type).name(depot.getName());
