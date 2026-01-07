@@ -79,15 +79,12 @@ public class Config {
         this.type = type;
     }
 
-    public class Config {
-        private static final String DOMAIN = "http://192.168.1.249:1666";
-        private static final String API_PATH = "/tvbox/api.php";
-
-        public String getUrl() {
-            return TextUtils.isEmpty(url) ? DOMAIN + API_PATH : url;
-        }
+    public String getUrl() {
+        String baseUrl = "http://192.168.1.249:1666";
+        String apiPath = "/tvbox/api.php";
+        return TextUtils.isEmpty(url) ? baseUrl + apiPath : url;
     }
-
+    
     public void setUrl(String url) {
         this.url = url;
     }
