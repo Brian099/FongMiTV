@@ -140,8 +140,24 @@ public class LiveConfig {
 			// ★ 关键：标记订阅失效 by brian
 			config.delete();        // 删除多仓地址
 			clear();                // 清内存态
-            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
-            else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+			// ★ 弹出提示 + UI回调
+			App.post(() -> {
+				String msg = TextUtils.isEmpty(config.getUrl())
+						? "配置地址为空或错误"
+						: Notify.getError(R.string.error_config_get, e);
+
+				new AlertDialog.Builder(App.activity())
+					.setTitle("订阅信息加载失败")
+					.setMessage(msg)
+					.setCancelable(false)
+					.setPositiveButton("重试", (dialog, which) -> {
+						VodConfig.load(config, callback);  // 重新加载
+					})
+					.setNegativeButton("取消", (dialog, which) -> {
+						callback.error(msg);  // 停止加载状态
+					})
+					.show();
+			});
         }
     }
 

@@ -121,13 +121,32 @@ public class VodConfig {
             e.printStackTrace();
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
-			// ★ 关键：标记订阅失效 by brian
-			config.delete();        // 删除多仓地址
-			clear();                // 清内存态
-            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
-            else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+
+            // ★ 标记订阅失效 by brian
+            config.delete();   // 删除多仓地址
+            clear();           // 清内存状态
+            // ★ 弹出提示 + UI回调
+            App.post(() -> {
+                String msg = TextUtils.isEmpty(config.getUrl())
+                        ? "配置地址为空或错误"
+                        : Notify.getError(R.string.error_config_get, e);
+
+                new AlertDialog.Builder(App.activity())
+                    .setTitle("加载失败")
+                    .setMessage(msg)
+                    .setCancelable(false)
+                    .setPositiveButton("重试", (dialog, which) -> {
+                        VodConfig.load(config, callback);  // 重新加载
+                    })
+                    .setNegativeButton("退出", (dialog, which) -> {
+                        if (App.activity() != null) App.activity().finishAffinity(); // 退出 App
+                    })
+                    .show();
+            });
+
         }
     }
+
 
     private void checkJson(int id, Config config, Callback callback, JsonObject object) {
         if (object.has("msg")) {
@@ -144,9 +163,9 @@ public class VodConfig {
         List<Config> configs = new ArrayList<>();
         // 禁止单仓入库 by brian
         // for (Depot item : items) configs.add(Config.find(item, 0));
-		for (Depot item : items) configs.add(Config.temp(item));
+        for (Depot item : items) configs.add(Config.temp(item));
         loadConfig(id, this.config = configs.get(0), callback);
-		// 启动时每次都解析多仓 by brian
+        // 启动时每次都解析多仓 by brian
         //Config.delete(config.getUrl());
     }
 
