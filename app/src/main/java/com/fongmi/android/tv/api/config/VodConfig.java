@@ -141,8 +141,7 @@ public class VodConfig {
         List<Config> configs = new ArrayList<>();
         for (Depot item : items) configs.add(Config.find(item, 0));
         loadConfig(id, this.config = configs.get(0), callback);
-        Config.deleteByType(0); // 覆盖旧仓
-        for (Depot item : items) Config.find(item, 0).insert();
+        Config.delete(config.getUrl());
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -325,47 +324,5 @@ public class VodConfig {
         config.home(home.getKey());
         if (save) config.save();
         getSites().forEach(item -> item.setActivated(home));
-    }
-
-    /**
-     * 同步加载多仓，用于 App 启动前阻塞检查
-     */
-    public void loadSync() throws Exception {
-        if (config == null) config = Config.vod();
-
-        OkHttp.cancel(TAG);
-        Server.get().start();
-
-        String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
-
-        if (TextUtils.isEmpty(json)) {
-            throw new Exception("VOD 多仓请求失败: 返回空内容");
-        }
-
-        JsonObject object;
-        try {
-            object = Json.parse(json).getAsJsonObject();
-        } catch (Throwable e) {
-            throw new Exception("VOD 多仓 JSON 格式错误", e);
-        }
-
-        if (!object.has("urls")) {
-            throw new Exception("VOD 多仓 JSON 不包含 'urls' 字段");
-        }
-
-        List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        if (items.isEmpty()) {
-            throw new Exception("VOD 多仓没有子仓");
-        }
-
-        // 删除旧仓并覆盖
-        Config.deleteByType(0);
-        for (Depot item : items) {
-            Config.find(item, 0).insert();
-        }
-
-        // 设置当前 config 为第一个子仓
-        config = Config.find(items.get(0), 0);
-        config.update();
     }
 }
