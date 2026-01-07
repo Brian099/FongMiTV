@@ -32,6 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import androidx.appcompat.app.AlertDialog;
+
 public class VodConfig {
 
     private static final String TAG = VodConfig.class.getSimpleName();
