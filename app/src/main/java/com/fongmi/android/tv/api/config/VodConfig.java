@@ -121,7 +121,12 @@ public class VodConfig {
 			if (Json.isObj(json)) {
 				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
 			} else {
-				parseText(id, config, callback, json);
+				// 如果返回的不是 JSON 对象，直接提示错误即可
+				App.post(() -> {
+					String msg = "配置数据格式错误";
+					Notify.show(msg);
+					callback.error(msg);
+				});
 			}
 
 			// 成功拉到多仓，更新缓存
