@@ -53,23 +53,37 @@ public class VodConfig {
         static volatile VodConfig INSTANCE = new VodConfig();
     }
 
-    public static VodConfig get() { return Loader.INSTANCE; }
+    public static VodConfig get() {
+        return Loader.INSTANCE;
+    }
 
-    public static int getCid() { return get().getConfig().getId(); }
+    public static int getCid() {
+        return get().getConfig().getId();
+    }
 
-    public static String getUrl() { return get().getConfig().getUrl(); }
+    public static String getUrl() {
+        return get().getConfig().getUrl();
+    }
 
-    public static String getDesc() { return get().getConfig().getDesc(); }
+    public static String getDesc() {
+        return get().getConfig().getDesc();
+    }
 
-    public static int getHomeIndex() { return get().getSites().indexOf(get().getHome()); }
+    public static int getHomeIndex() {
+        return get().getSites().indexOf(get().getHome());
+    }
 
-    public static boolean hasParse() { return !get().getParses().isEmpty(); }
+    public static boolean hasParse() {
+        return !get().getParses().isEmpty();
+    }
 
     public static void load(Config config, Callback callback) {
         get().clear().config(config).load(callback);
     }
 
-    public VodConfig init() { return config(Config.vod()); }
+    public VodConfig init() {
+        return config(Config.vod());
+    }
 
     public VodConfig config(Config config) {
         this.config = config;
@@ -102,13 +116,13 @@ public class VodConfig {
             Server.get().start();
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-
-            // 只有非运行态的 Config 才更新数据库
-            if (!config.isRuntime() && taskId.get() == id && config.equals(this.config)) {
+            if (taskId.get() == id && config.equals(this.config) && !config.isFromDepot()) {
                 config.update();
             }
         } catch (Throwable e) {
             e.printStackTrace();
+            // ⭐ 拉取失败也删除旧子仓
+            Config.deleteByType(0);
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
@@ -128,15 +142,16 @@ public class VodConfig {
 
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        List<Config> configs = new ArrayList<>();
-        for (Depot item : items) {
-            // 设置运行态，不落库
-            configs.add(Config.find(item, 0).setRuntime(true));
+        if (items.isEmpty()) {
+            Config.deleteByType(0);
+            App.post(() -> callback.error("多仓为空"));
+            return;
         }
-        // 使用第一个子仓作为运行态 Config
+        // ⭐ 删除旧子仓，覆盖式更新
+        Config.deleteByType(0);
+        List<Config> configs = new ArrayList<>();
+        for (Depot item : items) configs.add(Config.createFromDepot(item).insert());
         loadConfig(id, this.config = configs.get(0), callback);
-
-        // ⚠️ 不删除数据库，多仓 URL 保留
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -186,33 +201,29 @@ public class VodConfig {
     private void initSite(Config config, JsonObject object) {
         String spider = Json.safeString(object, "spider");
         BaseLoader.get().parseJar(spider, true);
-        setSites(Json.safeListElement(object, "sites")
-                .stream().map(e -> Site.objectFrom(e, spider))
-                .distinct().collect(Collectors.toCollection(ArrayList::new)));
+        setSites(Json.safeListElement(object, "sites").stream().map(e -> Site.objectFrom(e, spider)).distinct().collect(Collectors.toCollection(ArrayList::new)));
         Map<String, Site> items = Site.findAll().stream().collect(Collectors.toMap(Site::getKey, Function.identity()));
         getSites().forEach(site -> site.sync(items.get(site.getKey())));
-        setHome(config, getSites().isEmpty() ? new Site()
-                : getSites().stream().filter(item -> item.getKey().equals(config.getHome())).findFirst().orElse(getSites().get(0)), false);
+        setHome(config, getSites().isEmpty() ? new Site() : getSites().stream().filter(item -> item.getKey().equals(config.getHome())).findFirst().orElse(getSites().get(0)), false);
     }
 
     private void initParse(Config config, JsonObject object) {
-        setParses(Json.safeListElement(object, "parses")
-                .stream().map(Parse::objectFrom)
-                .distinct().collect(Collectors.toCollection(ArrayList::new)));
-        setParse(config, getParses().isEmpty() ? new Parse()
-                : getParses().stream().filter(item -> item.getName().equals(config.getParse())).findFirst().orElse(getParses().get(0)), false);
+        setParses(Json.safeListElement(object, "parses").stream().map(Parse::objectFrom).distinct().collect(Collectors.toCollection(ArrayList::new)));
+        setParse(config, getParses().isEmpty() ? new Parse() : getParses().stream().filter(item -> item.getName().equals(config.getParse())).findFirst().orElse(getParses().get(0)), false);
     }
 
-    // ------------------- Getter / Setter -------------------
     public List<Site> getSites() {
-		// 只返回运行态 Config 生成的子仓
-		return sites == null ? Collections.emptyList() : sites.stream()
-			.filter(site -> site.isRuntime())
-			.collect(Collectors.toList());
-	}
-    private void setSites(List<Site> sites) { this.sites = sites; }
+        return sites == null ? Collections.emptyList() : sites;
+    }
 
-    public List<Parse> getParses() { return parses == null ? Collections.emptyList() : parses; }
+    private void setSites(List<Site> sites) {
+        this.sites = sites;
+    }
+
+    public List<Parse> getParses() {
+        return parses == null ? Collections.emptyList() : parses;
+    }
+
     private void setParses(List<Parse> parses) {
         if (!parses.isEmpty()) parses.add(0, Parse.god());
         this.parses = parses;
@@ -225,41 +236,63 @@ public class VodConfig {
         items.addAll(doh);
         return items;
     }
-    private void setDoh(List<Doh> doh) { this.doh = doh; }
 
-    public List<Rule> getRules() { return rules == null ? Collections.emptyList() : rules; }
-    private void setRules(List<Rule> rules) { this.rules = rules; }
-
-    public List<Parse> getParses(int type) { return getParses().stream().filter(item -> item.getType() == type).toList(); }
-
-    public List<Parse> getParses(int type, String flag) {
-        List<Parse> items = getParses(type);
-        List<Parse> filter = items.stream().filter(item -> item.getExt().getFlag().contains(flag)).toList();
-        return filter.isEmpty() ? items : filter;
+    private void setDoh(List<Doh> doh) {
+        this.doh = doh;
     }
 
-    private void setHeaders(List<Header> headers) { OkHttp.responseInterceptor().addAll(headers); }
+    public List<Rule> getRules() {
+        return rules == null ? Collections.emptyList() : rules;
+    }
+
+    private void setRules(List<Rule> rules) {
+        this.rules = rules;
+    }
+
+    private void setHeaders(List<Header> headers) {
+        OkHttp.responseInterceptor().addAll(headers);
+    }
 
     private void setProxy(List<Proxy> proxy) {
         OkHttp.authenticator().addAll(proxy);
         OkHttp.selector().addAll(proxy);
     }
 
-    public List<String> getFlags() { return flags == null ? Collections.emptyList() : flags; }
-    private void setFlags(List<String> flags) { this.flags = flags; }
+    public List<String> getFlags() {
+        return flags == null ? Collections.emptyList() : flags;
+    }
 
-    private void setHosts(List<String> hosts) { OkHttp.dns().addAll(hosts); }
+    private void setFlags(List<String> flags) {
+        this.flags = flags;
+    }
 
-    public List<String> getAds() { return ads == null ? Collections.emptyList() : ads; }
-    private void setAds(List<String> ads) { this.ads = ads; }
+    private void setHosts(List<String> hosts) {
+        OkHttp.dns().addAll(hosts);
+    }
 
-    public Config getConfig() { return config == null ? Config.vod() : config; }
+    public List<String> getAds() {
+        return ads == null ? Collections.emptyList() : ads;
+    }
 
-    public Parse getParse() { return parse == null ? new Parse() : parse; }
+    private void setAds(List<String> ads) {
+        this.ads = ads;
+    }
 
-    public Site getHome() { return home == null ? new Site() : home; }
+    public Config getConfig() {
+        return config == null ? Config.vod() : config;
+    }
 
-    public String getWall() { return TextUtils.isEmpty(wall) ? "" : wall; }
+    public Parse getParse() {
+        return parse == null ? new Parse() : parse;
+    }
+
+    public Site getHome() {
+        return home == null ? new Site() : home;
+    }
+
+    public String getWall() {
+        return TextUtils.isEmpty(wall) ? "" : wall;
+    }
 
     public Parse getParse(String name) {
         return getParses().stream().filter(item -> item.getName().equals(name)).findFirst().orElse(new Parse());
@@ -269,7 +302,9 @@ public class VodConfig {
         return getSites().stream().filter(item -> item.getKey().equals(key)).findFirst().orElse(new Site());
     }
 
-    public void setParse(Parse parse) { setParse(getConfig(), parse, true); }
+    public void setParse(Parse parse) {
+        setParse(getConfig(), parse, true);
+    }
 
     private void setParse(Config config, Parse parse, boolean save) {
         this.parse = parse;
@@ -279,7 +314,9 @@ public class VodConfig {
         if (save) config.save();
     }
 
-    public void setHome(Site site) { setHome(getConfig(), site, true); }
+    public void setHome(Site site) {
+        setHome(getConfig(), site, true);
+    }
 
     private void setHome(Config config, Site site, boolean save) {
         home = site;
