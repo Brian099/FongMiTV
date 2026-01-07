@@ -239,6 +239,10 @@ public class Config {
         return item == null ? create(type, depot.getUrl(), depot.getName()) : item.type(type).name(depot.getName());
     }
 
+	public static void deleteByType(int type) {
+		AppDatabase.get().getConfigDao().deleteByType(type);
+	}
+	
     public Config insert() {
         if (isEmpty()) return this;
         setId(Math.toIntExact(AppDatabase.get().getConfigDao().insert(this)));

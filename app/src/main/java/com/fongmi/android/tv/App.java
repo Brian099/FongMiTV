@@ -21,6 +21,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import com.fongmi.android.tv.api.config.VodConfig;
+import com.fongmi.android.tv.api.config.LiveConfig;
 
 public class App extends Application implements Application.ActivityLifecycleCallbacks {
 
