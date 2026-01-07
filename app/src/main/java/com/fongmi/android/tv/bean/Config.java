@@ -238,18 +238,6 @@ public class Config {
         Config item = AppDatabase.get().getConfigDao().find(depot.getUrl(), type);
         return item == null ? create(type, depot.getUrl(), depot.getName()) : item.type(type).name(depot.getName());
     }
-	
-	// 单仓只存在缓存里，不写入数据库 by brian
-	public static Config temp(Depot depot) {
-		// 复用原有 find 逻辑
-		Config config = Config.find(depot, 0);
-
-		// 核心：禁止被识别为“可持久化对象”
-		config.setId(0);
-
-		return config;
-	}
-
 
     public Config insert() {
         if (isEmpty()) return this;

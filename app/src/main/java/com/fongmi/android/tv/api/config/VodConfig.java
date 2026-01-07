@@ -32,8 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import androidx.appcompat.app.AlertDialog;
-
 public class VodConfig {
 
     private static final String TAG = VodConfig.class.getSimpleName();
@@ -112,65 +110,21 @@ public class VodConfig {
         callback.start();
     }
 
-	private void loadConfig(int id, Config config, Callback callback) {
-		try {
-			OkHttp.cancel(TAG);
-			Server.get().start();
-			String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
-
-			if (Json.isObj(json)) {
-				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-			} else {
-				// JSON 格式错误 → 提示失败
-				App.post(() -> {
-					String msg = "配置数据格式错误";
-					Notify.show(msg);
-					callback.error(msg);
-				});
-				return;
-			}
-
-			// 成功拉到多仓，更新缓存
-			if (taskId.get() == id && config.equals(this.config)) config.update();
-
-		} catch (Throwable e) {
-			e.printStackTrace();
-			if (isCanceled(e)) return;
-			if (taskId.get() != id) return;
-
-			// 多仓接口失败 → 直接清空缓存
-			config.delete();    // 删除原有多仓/单仓
-			clear();
-
-			App.post(() -> {
-				String msg = TextUtils.isEmpty(config.getUrl())
-						? "配置地址为空或错误"
-						: Notify.getError(R.string.error_config_get, e);
-				Notify.show(msg);
-				callback.error(msg);
-			});
-		}
-	}
-
-	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
-		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-		if (items.isEmpty()) {
-			// 多仓为空 → 直接失败
-			App.post(() -> {
-				String msg = "多仓接口返回为空";
-				Notify.show(msg);
-				callback.error(msg);
-			});
-			return;
-		}
-
-		// 多仓成功 → 删除原单仓，重新解析
-		Config.delete(config.getUrl(), config.getType());
-
-		List<Config> configs = new ArrayList<>();
-		for (Depot item : items) configs.add(Config.find(item, 0)); // 0 = 多仓类型
-		loadConfig(id, this.config = configs.get(0), callback);
-	}
+    private void loadConfig(int id, Config config, Callback callback) {
+        try {
+            OkHttp.cancel(TAG);
+            Server.get().start();
+            String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
+            checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
+            if (taskId.get() == id && config.equals(this.config)) config.update();
+        } catch (Throwable e) {
+            e.printStackTrace();
+            if (isCanceled(e)) return;
+            if (taskId.get() != id) return;
+            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
+            else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+        }
+    }
 
     private void checkJson(int id, Config config, Callback callback, JsonObject object) {
         if (object.has("msg")) {
@@ -181,7 +135,15 @@ public class VodConfig {
             parseConfig(id, config, callback, object);
         }
     }
-	
+
+    private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
+        List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
+        List<Config> configs = new ArrayList<>();
+        for (Depot item : items) configs.add(Config.find(item, 0));
+        loadConfig(id, this.config = configs.get(0), callback);
+        Config.delete(config.getUrl());
+    }
+
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
         try {
             initList(object);

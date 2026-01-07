@@ -39,8 +39,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import androidx.appcompat.app.AlertDialog;
-
 public class LiveConfig {
 
     private static final String TAG = LiveConfig.class.getSimpleName();
@@ -127,66 +125,30 @@ public class LiveConfig {
         callback.start();
     }
 
-	private void loadConfig(int id, Config config, Callback callback) {
-		try {
-			OkHttp.cancel(TAG);
-			Server.get().start();
-			String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
+    private void loadConfig(int id, Config config, Callback callback) {
+        try {
+            OkHttp.cancel(TAG);
+            Server.get().start();
+            String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
+            if (Json.isObj(json)) checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
+            else parseText(id, config, callback, json);
+            if (taskId.get() == id && config.equals(this.config)) config.update();
+        } catch (Throwable e) {
+            e.printStackTrace();
+            if (isCanceled(e)) return;
+            if (taskId.get() != id) return;
+            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
+            else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+        }
+    }
 
-			if (Json.isObj(json)) {
-				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-			} else {
-				// JSON 格式错误 → 提示失败
-				App.post(() -> {
-					String msg = "配置数据格式错误";
-					Notify.show(msg);
-					if (callback != null) callback.error(msg);
-				});
-				return;
-			}
-
-			// 成功拉到多仓，更新缓存
-			if (taskId.get() == id && config.equals(this.config)) config.update();
-
-		} catch (Throwable e) {
-			e.printStackTrace();
-			if (isCanceled(e)) return;
-			if (taskId.get() != id) return;
-
-			// ★ 多仓接口失败 → 直接清空缓存
-			config.delete();    // 删除原有多仓/单仓
-			clear();
-
-			App.post(() -> {
-				String msg = TextUtils.isEmpty(config.getUrl())
-						? "配置地址为空或错误"
-						: Notify.getError(R.string.error_config_get, e);
-				Notify.show(msg);
-				if (callback != null) callback.error(msg);
-			});
-		}
-	}
-
-
-	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
-		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-		if (items.isEmpty()) {
-			// 多仓为空 → 直接失败
-			App.post(() -> {
-				String msg = "多仓接口返回为空";
-				Notify.show(msg);
-				if (callback != null) callback.error(msg);
-			});
-			return;
-		}
-
-		// 多仓成功 → 删除原单仓，重新解析
-		Config.delete(config.getUrl(), config.getType());
-
-		List<Config> configs = new ArrayList<>();
-		for (Depot item : items) configs.add(Config.find(item, 1)); // 1 = 多仓类型 live
-		loadConfig(id, this.config = configs.get(0), callback);
-	}
+    private void parseText(int id, Config config, Callback callback, String text) {
+        Live live = new Live(parseName(config.getUrl()), config.getUrl()).sync();
+        lives = new ArrayList<>(List.of(live));
+        LiveParser.text(live, text);
+        setHome(config, live, false);
+        if (taskId.get() == id) App.post(callback::success);
+    }
 
     private String parseName(String url) {
         Uri uri = Uri.parse(url);
@@ -203,6 +165,14 @@ public class LiveConfig {
         } else {
             parseConfig(id, config, callback, object);
         }
+    }
+
+    private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
+        List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
+        List<Config> configs = new ArrayList<>();
+        for (Depot item : items) configs.add(Config.find(item, 1));
+        loadConfig(id, this.config = configs.get(0), callback);
+        Config.delete(config.getUrl());
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
