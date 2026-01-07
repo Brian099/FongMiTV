@@ -61,19 +61,27 @@ public class App extends Application implements Application.ActivityLifecycleCal
 		Notify.createChannel();
 		registerActivityLifecycleCallbacks(this);
 
-		try {
-			// ----------- 阻塞加载 VOD 多仓 -----------------
-			VodConfig.get().loadSync();
-		} catch (Throwable e) {
-			e.printStackTrace();
-			// VOD 多仓拉取失败，直接闪退
-			System.exit(1);
-		}
+		// 在子线程拉取 VOD 多仓
+		App.submit(() -> {
+			try {
+				VodConfig.get().loadSync(); // 子线程同步拉取 VOD
+			} catch (Exception e) {
+				e.printStackTrace();
+				// 拉取失败直接闪退
+				android.os.Process.killProcess(android.os.Process.myPid());
+				return;
+			}
 
-		// VOD 成功后，异步加载 Live 多仓
-		LiveConfig.get().load();
+			// VOD 拉取成功 → 更新 Live 配置
+			LiveConfig.get().load();
+
+			// 如果有启动 UI 或 Splash，这里可以发通知回主线程
+			App.post(() -> {
+				// 启动 MainActivity 或关闭 Splash
+				// e.g. SplashActivity.this.finish();
+			});
+		});
 	}
-
 
     @Override
     public PackageManager getPackageManager() {
