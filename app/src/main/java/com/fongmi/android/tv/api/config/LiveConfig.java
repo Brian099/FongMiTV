@@ -136,7 +136,13 @@ public class LiveConfig {
 			if (Json.isObj(json)) {
 				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
 			} else {
-				parseText(id, config, callback, json);
+				// JSON 格式错误 → 提示失败
+				App.post(() -> {
+					String msg = "配置数据格式错误";
+					Notify.show(msg);
+					if (callback != null) callback.error(msg);
+				});
+				return;
 			}
 
 			// 成功拉到多仓，更新缓存
@@ -155,19 +161,32 @@ public class LiveConfig {
 				String msg = TextUtils.isEmpty(config.getUrl())
 						? "配置地址为空或错误"
 						: Notify.getError(R.string.error_config_get, e);
-				Notify.show(msg);       // 弹窗提示
-				callback.error(msg);    // 停止加载状态
+				Notify.show(msg);
+				if (callback != null) callback.error(msg);
 			});
 		}
 	}
 
-    private void parseText(int id, Config config, Callback callback, String text) {
-        Live live = new Live(parseName(config.getUrl()), config.getUrl()).sync();
-        lives = new ArrayList<>(List.of(live));
-        LiveParser.text(live, text);
-        setHome(config, live, false);
-        if (taskId.get() == id) App.post(callback::success);
-    }
+
+	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
+		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
+		if (items.isEmpty()) {
+			// 多仓为空 → 直接失败
+			App.post(() -> {
+				String msg = "多仓接口返回为空";
+				Notify.show(msg);
+				if (callback != null) callback.error(msg);
+			});
+			return;
+		}
+
+		// 多仓成功 → 删除原单仓，重新解析
+		Config.delete(config.getUrl(), config.getType());
+
+		List<Config> configs = new ArrayList<>();
+		for (Depot item : items) configs.add(Config.find(item, 1)); // 1 = 多仓类型 live
+		loadConfig(id, this.config = configs.get(0), callback);
+	}
 
     private String parseName(String url) {
         Uri uri = Uri.parse(url);
@@ -185,27 +204,6 @@ public class LiveConfig {
             parseConfig(id, config, callback, object);
         }
     }
-
-	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
-		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-		if (items.isEmpty()) {
-			// 多仓为空 → 直接失败
-			App.post(() -> {
-				String msg = "多仓接口返回为空";
-				Notify.show(msg);
-				callback.error(msg);
-			});
-			return;
-		}
-
-		// 多仓成功 → 删除原单仓，重新解析
-		Config.delete(config.getUrl(), config.getType());
-
-		List<Config> configs = new ArrayList<>();
-		for (Depot item : items) configs.add(Config.find(item, 1)); // 1 = 多仓类型live
-		loadConfig(id, this.config = configs.get(0), callback);
-	}
-
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
         try {

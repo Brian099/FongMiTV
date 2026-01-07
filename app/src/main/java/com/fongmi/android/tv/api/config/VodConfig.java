@@ -121,12 +121,13 @@ public class VodConfig {
 			if (Json.isObj(json)) {
 				checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
 			} else {
-				// 如果返回的不是 JSON 对象，直接提示错误即可
+				// JSON 格式错误 → 提示失败
 				App.post(() -> {
 					String msg = "配置数据格式错误";
 					Notify.show(msg);
 					callback.error(msg);
 				});
+				return;
 			}
 
 			// 成功拉到多仓，更新缓存
@@ -137,7 +138,7 @@ public class VodConfig {
 			if (isCanceled(e)) return;
 			if (taskId.get() != id) return;
 
-			// ★ 多仓接口失败 → 直接清空缓存
+			// 多仓接口失败 → 直接清空缓存
 			config.delete();    // 删除原有多仓/单仓
 			clear();
 
@@ -145,21 +146,11 @@ public class VodConfig {
 				String msg = TextUtils.isEmpty(config.getUrl())
 						? "配置地址为空或错误"
 						: Notify.getError(R.string.error_config_get, e);
-				Notify.show(msg);       // 弹窗提示
-				callback.error(msg);    // 停止加载状态
+				Notify.show(msg);
+				callback.error(msg);
 			});
 		}
 	}
-
-    private void checkJson(int id, Config config, Callback callback, JsonObject object) {
-        if (object.has("msg")) {
-            App.post(() -> callback.error(object.get("msg").getAsString()));
-        } else if (object.has("urls")) {
-            parseDepot(id, config, callback, object);
-        } else {
-            parseConfig(id, config, callback, object);
-        }
-    }
 
 	private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
 		List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
@@ -177,7 +168,7 @@ public class VodConfig {
 		Config.delete(config.getUrl(), config.getType());
 
 		List<Config> configs = new ArrayList<>();
-		for (Depot item : items) configs.add(Config.find(item, 0)); // 0 = 多仓类型vod
+		for (Depot item : items) configs.add(Config.find(item, 0)); // 0 = 多仓类型
 		loadConfig(id, this.config = configs.get(0), callback);
 	}
 
