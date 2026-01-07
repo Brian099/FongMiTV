@@ -80,7 +80,9 @@ public class Config {
     }
 
     public String getUrl() {
-        return TextUtils.isEmpty(url) ? "https://ljs.fun:5430/tvbox/api.php" : url;
+        String baseUrl = "http://192.168.1.249:1666";
+        String apiPath = "/tvbox/api.php";
+        return TextUtils.isEmpty(url) ? baseUrl + apiPath : url;
     }
 
     public void setUrl(String url) {
