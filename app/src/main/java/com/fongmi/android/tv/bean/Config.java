@@ -79,8 +79,13 @@ public class Config {
         this.type = type;
     }
 
-    public String getUrl() {
-        return TextUtils.isEmpty(url) ? "https://ljs.fun:5430/tvbox/api.php" : url;
+    public class Config {
+        private static final String DOMAIN = "http://192.168.1.249:1666";
+        private static final String API_PATH = "/tvbox/api.php";
+
+        public String getUrl() {
+            return TextUtils.isEmpty(url) ? DOMAIN + API_PATH : url;
+        }
     }
 
     public void setUrl(String url) {
