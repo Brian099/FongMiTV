@@ -122,7 +122,7 @@ public class VodConfig {
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
 			// ★ 关键：标记订阅失效 by brian
-			config.delete();        // 或 Config.delete(config.getUrl())
+			config.delete();        // 删除多仓地址
 			clear();                // 清内存态
             if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
             else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
@@ -142,9 +142,12 @@ public class VodConfig {
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
         List<Config> configs = new ArrayList<>();
-        for (Depot item : items) configs.add(Config.find(item, 0));
+		// 禁止单仓入库 by brian
+        // for (Depot item : items) configs.add(Config.find(item, 0));
+		for (Depot item : items) configs.add(Config.temp(item));
         loadConfig(id, this.config = configs.get(0), callback);
-        Config.delete(config.getUrl());
+		// 启动时每次都解析多仓 by brian
+        //Config.delete(config.getUrl());
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
