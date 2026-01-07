@@ -277,8 +277,10 @@ public class LiveConfig {
     }
 
     public List<Live> getLives() {
-        return lives == null ? lives = new ArrayList<>() : lives;
-    }
+		return lives == null ? new ArrayList<>() : lives.stream()
+			.filter(live -> live.isRuntime())
+			.collect(Collectors.toList());
+	}
 
     private void setLives(List<Live> lives) {
         this.lives = lives;

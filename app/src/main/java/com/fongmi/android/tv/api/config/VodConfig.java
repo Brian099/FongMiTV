@@ -204,7 +204,12 @@ public class VodConfig {
     }
 
     // ------------------- Getter / Setter -------------------
-    public List<Site> getSites() { return sites == null ? Collections.emptyList() : sites; }
+    public List<Site> getSites() {
+		// 只返回运行态 Config 生成的子仓
+		return sites == null ? Collections.emptyList() : sites.stream()
+			.filter(site -> site.isRuntime())
+			.collect(Collectors.toList());
+	}
     private void setSites(List<Site> sites) { this.sites = sites; }
 
     public List<Parse> getParses() { return parses == null ? Collections.emptyList() : parses; }
