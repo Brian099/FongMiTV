@@ -190,8 +190,9 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void initConfig() {
-        // 只先加载 VodConfig（包含多仓校验），通过后再在 success 回调里加载 Live/Wall
         VodConfig.get().init().load(getCallback());
+        LiveConfig.get().init().load();
+        WallConfig.get().init();
     }
 
     private Callback getCallback() {
@@ -203,42 +204,17 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
             @Override
             public void success() {
-                // VodConfig 初始化并校验通过后，才启动 Live/Wall 初始化
-                LiveConfig.get().init().load();
-                WallConfig.get().init().load();
-
                 showContent();
                 getHistory();
                 getVideo();
                 setLogo();
             }
 
-		@Override
-		public void error(String msg) {
-			// 把错误信息展示并提供选项，不再直接退出，便于调试
-			String content = msg == null ? "未知错误" : msg;
-			// 如果是我们标记的多仓校验失败，给出更明确提示
-			if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
-				content = "多仓校验失败（ERROR_DEPOT_INVALID）。请检查 depot 地址是否可达或返回了正确的 JSON。";
-			}
-			// 也同时在通知栏短暂展示（原有行为）
-			Notify.show(content);
-
-			// 弹窗显示详细信息并提供继续/退出
-			androidx.appcompat.app.AlertDialog.Builder builder =
-					new androidx.appcompat.app.AlertDialog.Builder(HomeActivity.this);
-			builder.setTitle("初始化错误")
-				   .setMessage(content + "\n\n请将下方日志（VodConfig 日志/响应预览）粘贴给开发者以便排查。")
-				   .setPositiveButton("继续", (d, which) -> {
-					   // 允许继续显示界面，便于查看 Notify、日志、其它页面
-					   showContent();
-				   })
-				   .setNegativeButton("退出", (d, which) -> {
-					   finishAffinity();
-				   })
-				   .setCancelable(false)
-				   .show();
-		}
+            @Override
+            public void error(String msg) {
+                Notify.show(msg);
+                showContent();
+            }
         };
     }
 
