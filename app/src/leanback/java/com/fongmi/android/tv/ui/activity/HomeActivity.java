@@ -213,18 +213,32 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
                 setLogo();
             }
 
-            @Override
-            public void error(String msg) {
-                // 识别多仓校验失败错误码 -> 直接停止应用（授权失败）
-                if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
-                    Notify.show("授权校验失败，应用已停止");
-                    // 结束应用（清除任务栈）
-                    finishAffinity();
-                    return;
-                }
-                Notify.show(msg);
-                showContent();
-            }
+		@Override
+		public void error(String msg) {
+			// 把错误信息展示并提供选项，不再直接退出，便于调试
+			String content = msg == null ? "未知错误" : msg;
+			// 如果是我们标记的多仓校验失败，给出更明确提示
+			if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
+				content = "多仓校验失败（ERROR_DEPOT_INVALID）。请检查 depot 地址是否可达或返回了正确的 JSON。";
+			}
+			// 也同时在通知栏短暂展示（原有行为）
+			Notify.show(content);
+
+			// 弹窗显示详细信息并提供继续/退出
+			androidx.appcompat.app.AlertDialog.Builder builder =
+					new androidx.appcompat.app.AlertDialog.Builder(HomeActivity.this);
+			builder.setTitle("初始化错误")
+				   .setMessage(content + "\n\n请将下方日志（VodConfig 日志/响应预览）粘贴给开发者以便排查。")
+				   .setPositiveButton("继续", (d, which) -> {
+					   // 允许继续显示界面，便于查看 Notify、日志、其它页面
+					   showContent();
+				   })
+				   .setNegativeButton("退出", (d, which) -> {
+					   finishAffinity();
+				   })
+				   .setCancelable(false)
+				   .show();
+		}
         };
     }
 
