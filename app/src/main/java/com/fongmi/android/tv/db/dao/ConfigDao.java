@@ -36,7 +36,7 @@ public abstract class ConfigDao extends BaseDao<Config> {
     @Query("DELETE FROM Config WHERE url = :url")
     public abstract void delete(String url);
 	
-	// app启动时清除配置，从多仓重新拉取 位置3/3 by brian
+	// app启动时清除配置，从多仓重新拉取 位置4/4 by brian
 	@Query("DELETE FROM Config") // add
     public abstract void deleteAll();  // 添加 public abstract
     

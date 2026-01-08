@@ -115,6 +115,9 @@ public class HomeActivity extends BaseActivity implements NavigationBarView.OnIt
     }
 
     private void initConfig() {
+		// app启动时清除配置，从多仓重新拉取 位置1/4 by brian
+		Config.clear(); // add
+		
         VodConfig.get().init().load(getCallback());
         LiveConfig.get().init().load();
         WallConfig.get().init();
