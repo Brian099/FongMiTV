@@ -48,8 +48,10 @@ public class VodConfig {
     private List<String> flags;
     private List<Parse> parses;
     private Future<?> future;
-	// by brian
-	private boolean strictBoot = false;
+
+    // ★ 新增：启动严格校验开关
+    private boolean strictBoot = false;
+    private boolean bootChecked = false;
 
     private static class Loader {
         static volatile VodConfig INSTANCE = new VodConfig();
@@ -59,34 +61,10 @@ public class VodConfig {
         return Loader.INSTANCE;
     }
 
-    public static int getCid() {
-        return get().getConfig().getId();
+    public VodConfig strictBoot(boolean enable) {
+        this.strictBoot = enable;
+        return this;
     }
-
-    public static String getUrl() {
-        return get().getConfig().getUrl();
-    }
-
-    public static String getDesc() {
-        return get().getConfig().getDesc();
-    }
-
-    public static int getHomeIndex() {
-        return get().getSites().indexOf(get().getHome());
-    }
-
-    public static boolean hasParse() {
-        return !get().getParses().isEmpty();
-    }
-
-    public static void load(Config config, Callback callback) {
-        get().clear().config(config).load(callback);
-    }
-	// by brian
-	public VodConfig strictBoot(boolean enable) {
-		this.strictBoot = enable;
-		return this;
-	}
 
     public VodConfig init() {
         return config(Config.vod());
@@ -107,7 +85,9 @@ public class VodConfig {
     }
 
     private boolean isCanceled(Throwable e) {
-        return "Canceled".equals(e.getMessage()) || e instanceof InterruptedException || e instanceof InterruptedIOException;
+        return "Canceled".equals(e.getMessage()) ||
+                e instanceof InterruptedException ||
+                e instanceof InterruptedIOException;
     }
 
     public void load(Callback callback) {
@@ -121,43 +101,87 @@ public class VodConfig {
         try {
             OkHttp.cancel(TAG);
             Server.get().start();
+
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
-            checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
-            if (taskId.get() == id && config.equals(this.config)) config.update();
+            if (TextUtils.isEmpty(json)) {
+                throw new Exception("配置请求返回空内容");
+            }
+
+            JsonObject object;
+            try {
+                object = Json.parse(json).getAsJsonObject();
+            } catch (Throwable e) {
+                throw new Exception("配置 JSON 格式错误", e);
+            }
+
+            // ★ 只在【启动 + 内置 VOD + 第一次】做多仓严格校验
+            boolean strictCheck = strictBoot && !bootChecked && config == Config.vod();
+
+            if (strictCheck) {
+                if (!object.has("urls")) {
+                    throw new Exception("多仓数据无效（缺少 urls 字段）");
+                }
+            }
+
+            checkJson(id, config, callback, object);
+
+            if (taskId.get() == id && config.equals(this.config)) {
+                config.update();
+            }
+
         } catch (Throwable e) {
             e.printStackTrace();
             if (isCanceled(e)) return;
             if (taskId.get() != id) return;
-            if (TextUtils.isEmpty(config.getUrl())) App.post(() -> callback.error(""));
-            else App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+
+            if (strictBoot && config == Config.vod() && !bootChecked) {
+                String msg = Notify.getError(R.string.error_config_get, e);
+                App.post(() -> {
+                    Notify.show(
+                            TextUtils.isEmpty(msg)
+                                    ? "VOD 多仓加载失败，请检查网络或授权"
+                                    : msg
+                    );
+                    if (App.activity() != null) {
+                        App.activity().finish();
+                    }
+                });
+                return;
+            }
+
+            if (callback != null) {
+                App.post(() -> callback.error(Notify.getError(R.string.error_config_get, e)));
+            }
         }
     }
-		//by brian
-	private void checkJson(int id, Config config, Callback callback, JsonObject object) {
 
-		// 只在【启动 + 内置多仓】时严格校验
-		if (strictBoot && config.isVod() && config.isHome()) {
-			if (!object.has("urls") || !object.get("urls").isJsonArray()) {
-				App.post(() -> callback.error("多仓数据无效或授权已失效"));
-				return;
-			}
-		}
-
-		if (object.has("msg")) {
-			App.post(() -> callback.error(object.get("msg").getAsString()));
-		} else if (object.has("urls")) {
-			parseDepot(id, config, callback, object);
-		} else {
-			parseConfig(id, config, callback, object);
-		}
-	}
+    private void checkJson(int id, Config config, Callback callback, JsonObject object) {
+        if (object.has("msg")) {
+            App.post(() -> callback.error(object.get("msg").getAsString()));
+        } else if (object.has("urls")) {
+            parseDepot(id, config, callback, object);
+        } else {
+            parseConfig(id, config, callback, object);
+        }
+    }
 
     private void parseDepot(int id, Config config, Callback callback, JsonObject object) {
         List<Depot> items = Depot.arrayFrom(object.getAsJsonArray("urls").toString());
-        List<Config> configs = new ArrayList<>();
-        for (Depot item : items) configs.add(Config.find(item, 0));
-        loadConfig(id, this.config = configs.get(0), callback);
+        if (items.isEmpty()) {
+            throw new RuntimeException("多仓 urls 为空");
+        }
+
+        // ★ 覆盖旧 VOD 子仓
         Config.delete(config.getUrl());
+        List<Config> configs = new ArrayList<>();
+        for (Depot item : items) {
+            configs.add(Config.find(item, 0));
+        }
+
+        // ★ 标记：启动多仓校验已完成
+        bootChecked = true;
+
+        loadConfig(id, this.config = configs.get(0), callback);
     }
 
     private void parseConfig(int id, Config config, Callback callback, JsonObject object) {
@@ -167,11 +191,15 @@ public class VodConfig {
             initWall(config, object);
             initSite(config, object);
             initParse(config, object);
+
             config.logo(Json.safeString(object, "logo"));
             String notice = Json.safeString(object, "notice");
+
             if (taskId.get() != id) return;
+
             App.post(() -> callback.success(notice));
             App.post(callback::success);
+
         } catch (Throwable e) {
             e.printStackTrace();
             if (taskId.get() != id) return;
@@ -198,7 +226,7 @@ public class VodConfig {
 
     private void initWall(Config config, JsonObject object) {
         if (Json.isEmpty(object, "wallpaper")) return;
-        this.wall = Json.safeString(object, "wallpaper");
+        wall = Json.safeString(object, "wallpaper");
         Config temp = Config.find(wall, config.getName(), 2).save();
         boolean sync = WallConfig.get().needSync(wall);
         if (sync) WallConfig.get().config(temp.update());
@@ -207,15 +235,52 @@ public class VodConfig {
     private void initSite(Config config, JsonObject object) {
         String spider = Json.safeString(object, "spider");
         BaseLoader.get().parseJar(spider, true);
-        setSites(Json.safeListElement(object, "sites").stream().map(e -> Site.objectFrom(e, spider)).distinct().collect(Collectors.toCollection(ArrayList::new)));
-        Map<String, Site> items = Site.findAll().stream().collect(Collectors.toMap(Site::getKey, Function.identity()));
+
+        setSites(
+                Json.safeListElement(object, "sites")
+                        .stream()
+                        .map(e -> Site.objectFrom(e, spider))
+                        .distinct()
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
+
+        Map<String, Site> items = Site.findAll()
+                .stream()
+                .collect(Collectors.toMap(Site::getKey, Function.identity()));
+
         getSites().forEach(site -> site.sync(items.get(site.getKey())));
-        setHome(config, getSites().isEmpty() ? new Site() : getSites().stream().filter(item -> item.getKey().equals(config.getHome())).findFirst().orElse(getSites().get(0)), false);
+
+        setHome(
+                config,
+                getSites().isEmpty()
+                        ? new Site()
+                        : getSites().stream()
+                        .filter(item -> item.getKey().equals(config.getHome()))
+                        .findFirst()
+                        .orElse(getSites().get(0)),
+                false
+        );
     }
 
     private void initParse(Config config, JsonObject object) {
-        setParses(Json.safeListElement(object, "parses").stream().map(Parse::objectFrom).distinct().collect(Collectors.toCollection(ArrayList::new)));
-        setParse(config, getParses().isEmpty() ? new Parse() : getParses().stream().filter(item -> item.getName().equals(config.getParse())).findFirst().orElse(getParses().get(0)), false);
+        setParses(
+                Json.safeListElement(object, "parses")
+                        .stream()
+                        .map(Parse::objectFrom)
+                        .distinct()
+                        .collect(Collectors.toCollection(ArrayList::new))
+        );
+
+        setParse(
+                config,
+                getParses().isEmpty()
+                        ? new Parse()
+                        : getParses().stream()
+                        .filter(item -> item.getName().equals(config.getParse()))
+                        .findFirst()
+                        .orElse(getParses().get(0)),
+                false
+        );
     }
 
     public List<Site> getSites() {
@@ -255,16 +320,6 @@ public class VodConfig {
         this.rules = rules;
     }
 
-    public List<Parse> getParses(int type) {
-        return getParses().stream().filter(item -> item.getType() == type).toList();
-    }
-
-    public List<Parse> getParses(int type, String flag) {
-        List<Parse> items = getParses(type);
-        List<Parse> filter = items.stream().filter(item -> item.getExt().getFlag().contains(flag)).toList();
-        return filter.isEmpty() ? items : filter;
-    }
-
     private void setHeaders(List<Header> headers) {
         OkHttp.responseInterceptor().addAll(headers);
     }
@@ -274,64 +329,16 @@ public class VodConfig {
         OkHttp.selector().addAll(proxy);
     }
 
-    public List<String> getFlags() {
-        return flags == null ? Collections.emptyList() : flags;
+    private void setHosts(List<String> hosts) {
+        OkHttp.dns().addAll(hosts);
     }
 
     private void setFlags(List<String> flags) {
         this.flags = flags;
     }
 
-    private void setHosts(List<String> hosts) {
-        OkHttp.dns().addAll(hosts);
-    }
-
-    public List<String> getAds() {
-        return ads == null ? Collections.emptyList() : ads;
-    }
-
     private void setAds(List<String> ads) {
         this.ads = ads;
-    }
-
-    public Config getConfig() {
-        return config == null ? Config.vod() : config;
-    }
-
-    public Parse getParse() {
-        return parse == null ? new Parse() : parse;
-    }
-
-    public Site getHome() {
-        return home == null ? new Site() : home;
-    }
-
-    public String getWall() {
-        return TextUtils.isEmpty(wall) ? "" : wall;
-    }
-
-    public Parse getParse(String name) {
-        return getParses().stream().filter(item -> item.getName().equals(name)).findFirst().orElse(new Parse());
-    }
-
-    public Site getSite(String key) {
-        return getSites().stream().filter(item -> item.getKey().equals(key)).findFirst().orElse(new Site());
-    }
-
-    public void setParse(Parse parse) {
-        setParse(getConfig(), parse, true);
-    }
-
-    private void setParse(Config config, Parse parse, boolean save) {
-        this.parse = parse;
-        this.parse.setActivated(true);
-        config.parse(parse.getName());
-        getParses().forEach(item -> item.setActivated(parse));
-        if (save) config.save();
-    }
-
-    public void setHome(Site site) {
-        setHome(getConfig(), site, true);
     }
 
     private void setHome(Config config, Site site, boolean save) {
@@ -340,5 +347,13 @@ public class VodConfig {
         config.home(home.getKey());
         if (save) config.save();
         getSites().forEach(item -> item.setActivated(home));
+    }
+
+    private void setParse(Config config, Parse parse, boolean save) {
+        this.parse = parse;
+        this.parse.setActivated(true);
+        config.parse(parse.getName());
+        getParses().forEach(item -> item.setActivated(parse));
+        if (save) config.save();
     }
 }
