@@ -182,12 +182,18 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mAdapter.add(R.string.home_history);
         mAdapter.add(R.string.home_recommend);
     }
-
-    private void setTitle() {
-        List<String> items = Arrays.asList(getHome().getName(), getConfig().getName(), getString(R.string.app_name));
-        Optional<String> optional = items.stream().filter(s -> !TextUtils.isEmpty(s)).findFirst();
-        optional.ifPresent(s -> mBinding.title.setText(s));
-    }
+	
+	// 配置获取失败时源地址位置显示提示，而不是源地址 by brian
+	private void setTitle() {
+		String name = getConfig().getName();
+		
+		// 如果名称存在且不以http开头，显示名称；否则显示错误提示
+		if (name != null && !name.startsWith("http")) {
+			mBinding.title.setText(name);
+		} else {
+			mBinding.title.setText(getString(R.string.error_config_get));
+		}
+	}
 
     private void initConfig() {
 		// app启动时清除配置，从多仓重新拉取 位置2/4 by brian
