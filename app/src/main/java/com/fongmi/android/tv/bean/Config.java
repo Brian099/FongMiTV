@@ -62,6 +62,11 @@ public class Config {
     public static Config create(int type, String url, String name) {
         return new Config().type(type).url(url).name(name).insert();
     }
+	
+	// brian
+	public static void clear() {
+		AppDatabase.get().getConfigDao().deleteAll();
+	}
 
     public int getId() {
         return id;
