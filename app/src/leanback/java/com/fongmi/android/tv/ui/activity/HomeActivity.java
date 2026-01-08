@@ -212,6 +212,13 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
             @Override
             public void error(String msg) {
+                // 识别多仓校验失败错误码 -> 直接停止应用（授权失败）
+                if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
+                    Notify.show("授权校验失败，应用已停止");
+                    // 结束应用（清除任务栈）
+                    finishAffinity();
+                    return;
+                }
                 Notify.show(msg);
                 showContent();
             }

@@ -37,6 +37,9 @@ public class VodConfig {
     private static final String TAG = VodConfig.class.getSimpleName();
     private final AtomicInteger taskId = new AtomicInteger(0);
 
+    // 特定错误码：多仓校验失败（不可达或无子仓）
+    public static final String ERROR_DEPOT_INVALID = "error_depot_invalid";
+
     private Site home;
     private String wall;
     private Parse parse;
@@ -114,6 +117,32 @@ public class VodConfig {
         try {
             OkHttp.cancel(TAG);
             Server.get().start();
+
+            // ---------- 新增：每次启动都先检查内置的多仓地址（depot） ----------
+            try {
+                String depotUrl = UrlUtil.convert(Config.vod().getUrl());
+                String depotJson = Decoder.getJson(depotUrl, TAG);
+                JsonObject depotObj = Json.parse(depotJson).getAsJsonObject();
+                if (!depotObj.has("urls")) {
+                    // 多仓缺失 urls 字段 -> 视为授权/数据无效
+                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                    return;
+                }
+                List<Depot> depotItems = Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
+                if (depotItems.isEmpty()) {
+                    // 多仓没有任何子仓 -> 视为授权/数据无效
+                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                    return;
+                }
+            } catch (Throwable e) {
+                e.printStackTrace();
+                if (isCanceled(e)) return;
+                // 多仓不可达或解析失败，视为授权失败
+                App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                return;
+            }
+            // ---------- 多仓校验通过，继续按原逻辑加载目标配置 ----------
+
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
             if (taskId.get() == id && config.equals(this.config)) config.update();

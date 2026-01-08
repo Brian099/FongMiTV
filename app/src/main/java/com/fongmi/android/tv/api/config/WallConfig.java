@@ -86,6 +86,29 @@ public class WallConfig {
     private void loadConfig(int id, Config config, Callback callback) {
         try {
             OkHttp.cancel(TAG);
+
+            // ---------- 新增：每次启动都先检查内置的多仓地址（depot） ----------
+            try {
+                String depotUrl = UrlUtil.convert(Config.vod().getUrl());
+                String depotJson = Decoder.getJson(depotUrl, TAG);
+                com.google.gson.JsonObject depotObj = com.github.catvod.utils.Json.parse(depotJson).getAsJsonObject();
+                if (!depotObj.has("urls")) {
+                    App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
+                    return;
+                }
+                java.util.List<com.fongmi.android.tv.bean.Depot> depotItems = com.fongmi.android.tv.bean.Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
+                if (depotItems.isEmpty()) {
+                    App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
+                    return;
+                }
+            } catch (Throwable e) {
+                e.printStackTrace();
+                if (isCanceled(e)) return;
+                App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
+                return;
+            }
+            // ---------- 多仓校验通过，继续按原逻辑加载壁纸 ----------
+
             download(id, config.getUrl(), callback);
             if (taskId.get() == id && config.equals(this.config)) config.update();
         } catch (Throwable e) {
