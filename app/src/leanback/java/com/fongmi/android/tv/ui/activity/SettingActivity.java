@@ -62,6 +62,54 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
         return getString(value ? R.string.setting_on : R.string.setting_off);
     }
 
+	/**
+	 * 获取点播配置的显示文本
+	 */
+	private String getVodDisplayText() {
+		Config config = VodConfig.get().getConfig();
+		if (config == null) return getString(R.string.error_config_get);
+		
+		String name = config.getName();
+		// 检查是否是有效的配置名称（不是URL格式）
+		if (!TextUtils.isEmpty(name) && !name.startsWith("http") && !name.contains("://")) {
+			return name;  // 显示子仓库名称
+		} else {
+			return getString(R.string.error_config_get);  // 使用错误字符串，不显示URL
+		}
+	}
+
+	/**
+	 * 获取直播配置的显示文本
+	 */
+	private String getLiveDisplayText() {
+		Config config = LiveConfig.get().getConfig();
+		if (config == null) return getString(R.string.error_config_get);
+		
+		String name = config.getName();
+		// 检查是否是有效的配置名称（不是URL格式）
+		if (!TextUtils.isEmpty(name) && !name.startsWith("http") && !name.contains("://")) {
+			return name;  // 显示配置名称
+		} else {
+			return getString(R.string.error_config_get);  // 使用错误字符串，不显示URL
+		}
+	}
+
+	/**
+	 * 获取壁纸配置的显示文本
+	 */
+	private String getWallDisplayText() {
+		Config config = WallConfig.get().getConfig();
+		if (config == null) return getString(R.string.error_config_get);
+		
+		String name = config.getName();
+		// 检查是否是有效的配置名称（不是URL格式）
+		if (!TextUtils.isEmpty(name) && !name.startsWith("http") && !name.contains("://")) {
+			return name;  // 显示配置名称
+		} else {
+			return getString(R.string.error_config_get);  // 使用错误字符串，不显示URL
+		}
+	}
+
     private int getDohIndex() {
         return Math.max(0, VodConfig.get().getDoh().indexOf(Doh.objectFrom(Setting.getDoh())));
     }
@@ -80,10 +128,10 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
     @Override
     protected void initView() {
         mBinding.vod.requestFocus();
-        mBinding.vodUrl.setText(VodConfig.getDesc());
-        mBinding.liveUrl.setText(LiveConfig.getDesc());
-        //mBinding.wallUrl.setText(WallConfig.getDesc());
-		mBinding.wallUrl.setText("点击按钮更换壁纸"); // 修改为固定文字 by brian
+		// 使用各自的显示方法
+		mBinding.vodUrl.setText(getVodDisplayText());
+		mBinding.liveUrl.setText(getLiveDisplayText());
+		mBinding.wallUrl.setText(getWallDisplayText());
         mBinding.versionText.setText(BuildConfig.VERSION_NAME);
         setCacheText();
         setOtherText();
@@ -335,10 +383,10 @@ public class SettingActivity extends BaseActivity implements ConfigCallback, Sit
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onRefreshEvent(RefreshEvent event) {
         if (event.getType() != RefreshEvent.Type.CONFIG) return;
-        mBinding.vodUrl.setText(VodConfig.getDesc());
-        mBinding.liveUrl.setText(LiveConfig.getDesc());
-        //mBinding.wallUrl.setText(WallConfig.getDesc());
-		mBinding.wallUrl.setText("点击按钮更换壁纸"); // 修改为固定文字 by brian
+		// 使用各自的显示方法
+		mBinding.vodUrl.setText(getVodDisplayText());
+		mBinding.liveUrl.setText(getLiveDisplayText());
+		mBinding.wallUrl.setText(getWallDisplayText());
     }
 
     private final ActivityResultLauncher<Intent> launcher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
