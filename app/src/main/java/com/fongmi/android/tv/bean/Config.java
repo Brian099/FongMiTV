@@ -63,10 +63,10 @@ public class Config {
         return new Config().type(type).url(url).name(name).insert();
     }
 	
-	// brian
-	public static void clear() {
-		AppDatabase.get().getConfigDao().deleteAll();
-	}
+	// app启动时清除配置，从多仓重新拉取 位置2/3 by brian
+	public static void clear() { // add
+		AppDatabase.get().getConfigDao().deleteAll(); // add
+	} // add
 
     public int getId() {
         return id;

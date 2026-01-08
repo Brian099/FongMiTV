@@ -190,8 +190,8 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void initConfig() {
-		// by brian
-		Config.clear();
+		// app启动时清除配置，从多仓重新拉取 位置1/3 by brian
+		Config.clear(); // add
 		
         VodConfig.get().init().load(getCallback());
         LiveConfig.get().init().load();
