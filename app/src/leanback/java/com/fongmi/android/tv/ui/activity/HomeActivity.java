@@ -183,7 +183,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mAdapter.add(R.string.home_recommend);
     }
 	
-	// 配置获取失败时源地址位置显示提示，而不是源地址 by brian
+	// 配置获取失败时主页左上角名称位置显示提示，而不是源地址 by brian
 	private void setTitle() {
 		String name = getConfig().getName();
 		
