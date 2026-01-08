@@ -41,6 +41,9 @@ public class VodConfig {
     // 特定错误码：多仓校验失败（不可达或无子仓）
     public static final String ERROR_DEPOT_INVALID = "error_depot_invalid";
 
+    // 标记多仓是否已校验通过（避免重复校验）
+    private volatile boolean depotVerified = false;
+
     private Site home;
     private String wall;
     private Parse parse;
@@ -119,37 +122,39 @@ public class VodConfig {
             OkHttp.cancel(TAG);
             Server.get().start();
 
-            // ---------- 新增：每次启动都先检查内置的多仓地址（depot），并记录少量调试信息 ----------
+            // 仅当正在加载的 config 为内置多仓入口（Config.vod()）且尚未验证时，才执行多仓校验
             try {
-                String depotUrl = UrlUtil.convert(Config.vod().getUrl());
-                Log.d(TAG, "Checking depot URL: " + depotUrl);
-                String depotJson = Decoder.getJson(depotUrl, TAG);
+                if (!depotVerified && config.equals(Config.vod())) {
+                    String depotUrl = UrlUtil.convert(Config.vod().getUrl());
+                    Log.d(TAG, "Checking depot URL: " + depotUrl);
+                    String depotJson = Decoder.getJson(depotUrl, TAG);
 
-                // 把响应首部一段截取显示，避免过长
-                String preview = depotJson == null ? "" : depotJson.length() > 500 ? depotJson.substring(0, 500) + "..." : depotJson;
-                Log.d(TAG, "Depot response preview: " + preview);
-                App.post(() -> {
-                    // 在 UI 上短暂显示以便调试（可删除）
-                    Notify.show("depot ok preview: " + (preview.length() > 100 ? preview.substring(0, 100) + "..." : preview));
-                });
+                    String preview = depotJson == null ? "" : depotJson.length() > 500 ? depotJson.substring(0, 500) + "..." : depotJson;
+                    Log.d(TAG, "Depot response preview: " + preview);
+                    App.post(() -> {
+                        // 在 UI 上短暂显示以便调试（可移除）
+                        Notify.show("depot ok preview: " + (preview.length() > 100 ? preview.substring(0, 100) + "..." : preview));
+                    });
 
-                // 必须是 JSON 对象并包含 urls 字段且列表不为空
-                if (!Json.isObj(depotJson)) {
-                    Log.e(TAG, "Depot response is not JSON object");
-                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
-                    return;
-                }
-                JsonObject depotObj = Json.parse(depotJson).getAsJsonObject();
-                if (!depotObj.has("urls")) {
-                    Log.e(TAG, "Depot JSON has no 'urls' field");
-                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
-                    return;
-                }
-                List<Depot> depotItems = Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
-                if (depotItems.isEmpty()) {
-                    Log.e(TAG, "Depot 'urls' is empty");
-                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
-                    return;
+                    if (!Json.isObj(depotJson)) {
+                        Log.e(TAG, "Depot response is not JSON object");
+                        App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                        return;
+                    }
+                    JsonObject depotObj = Json.parse(depotJson).getAsJsonObject();
+                    if (!depotObj.has("urls")) {
+                        Log.e(TAG, "Depot JSON has no 'urls' field");
+                        App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                        return;
+                    }
+                    List<Depot> depotItems = Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
+                    if (depotItems.isEmpty()) {
+                        Log.e(TAG, "Depot 'urls' is empty");
+                        App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                        return;
+                    }
+                    // 校验通过，设置标记，后续不再重复校验
+                    depotVerified = true;
                 }
             } catch (Throwable e) {
                 e.printStackTrace();
@@ -158,7 +163,6 @@ public class VodConfig {
                 App.post(() -> callback.error(ERROR_DEPOT_INVALID));
                 return;
             }
-            // ---------- 多仓校验通过，继续按原逻辑加载目标配置 ----------
 
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
