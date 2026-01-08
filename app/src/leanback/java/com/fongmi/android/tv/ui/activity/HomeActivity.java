@@ -126,45 +126,6 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         setLogo();
     }
 
-    private void initConfig() {
-        // 只先加载 VodConfig（包含多仓校验），通过后再在 success 回调里加载 Live/Wall
-        VodConfig.get().init().load(getCallback());
-    }
-
-    private Callback getCallback() {
-        return new Callback() {
-            @Override
-            public void success(String result) {
-                Notify.show(result);
-            }
-
-            @Override
-            public void success() {
-                // VodConfig 初始化并校验通过后，才启动 Live/Wall 初始化
-                LiveConfig.get().init().load();
-                WallConfig.get().init().load();
-
-                showContent();
-                getHistory();
-                getVideo();
-                setLogo();
-            }
-
-            @Override
-            public void error(String msg) {
-                // 识别多仓校验失���错误码 -> 直接停止应用（授权失败）
-                if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
-                    Notify.show("授权校验失败，应用已停止");
-                    // 结束应用（清除任务栈）
-                    finishAffinity();
-                    return;
-                }
-                Notify.show(msg);
-                showContent();
-            }
-        };
-    }
-
     @Override
     protected void initEvent() {
         mBinding.title.setListener(this);
@@ -228,5 +189,320 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         optional.ifPresent(s -> mBinding.title.setText(s));
     }
 
-    // 其余代码保持不变（省略）...
+    private void initConfig() {
+        // 只先加载 VodConfig（包含多仓校验），通过后再在 success 回调里加载 Live/Wall
+        VodConfig.get().init().load(getCallback());
+    }
+
+    private Callback getCallback() {
+        return new Callback() {
+            @Override
+            public void success(String result) {
+                Notify.show(result);
+            }
+
+            @Override
+            public void success() {
+                // VodConfig 初始化并校验通过后，才启动 Live/Wall 初始化
+                LiveConfig.get().init().load();
+                WallConfig.get().init().load();
+
+                showContent();
+                getHistory();
+                getVideo();
+                setLogo();
+            }
+
+            @Override
+            public void error(String msg) {
+                // 识别多仓校验失败错误码 -> 直接停止应用（授权失败）
+                if (VodConfig.ERROR_DEPOT_INVALID.equals(msg)) {
+                    Notify.show("授权校验失败，应用已停止");
+                    // 结束应用（清除任务栈）
+                    finishAffinity();
+                    return;
+                }
+                Notify.show(msg);
+                showContent();
+            }
+        };
+    }
+
+    private void showContent() {
+        mBinding.progressLayout.showContent();
+        checkAction(getIntent());
+        setFocus();
+        setFunc();
+    }
+
+    private void loadLive(String url) {
+        LiveConfig.load(Config.find(url, 1), new Callback() {
+            @Override
+            public void success() {
+                LiveActivity.start(getActivity());
+            }
+        });
+    }
+
+    private void setFocus() {
+        mBinding.title.setSelected(true);
+        App.post(() -> mBinding.title.setFocusable(true), 500);
+        if (!mBinding.title.hasFocus()) mBinding.recycler.requestFocus();
+    }
+
+    private void getVideo() {
+        setTitle();
+        mResult = Result.empty();
+        int index = getRecommendIndex();
+        boolean gone = mAdapter.indexOf("progress") == -1;
+        boolean hasItem = gone && mAdapter.size() > index;
+        if (hasItem) mAdapter.removeItems(index, mAdapter.size() - index);
+        if (gone) mAdapter.add("progress");
+        mViewModel.homeContent();
+    }
+
+    private void addVideo(Result result) {
+        Style style = result.getStyle(getHome().getStyle());
+        if (style.isList()) mAdapter.addAll(mAdapter.size(), result.getList());
+        else addGrid(result.getList(), style);
+    }
+
+    private void addGrid(List<Vod> items, Style style) {
+        for (List<Vod> part : Lists.partition(items, Product.getColumn(style))) {
+            ArrayObjectAdapter adapter = new ArrayObjectAdapter(new VodPresenter(this, style));
+            adapter.setItems(part, new BaseDiffCallback<Vod>());
+            mAdapter.add(new ListRow(adapter));
+        }
+    }
+
+    private void setFunc() {
+        List<Func> items = new ArrayList<>();
+        items.add(Func.create(R.string.home_vod));
+        if (LiveConfig.hasUrl()) items.add(Func.create(R.string.home_live));
+        items.add(Func.create(R.string.home_search));
+        items.add(Func.create(R.string.home_keep));
+        items.add(Func.create(R.string.home_push));
+        items.add(Func.create(R.string.home_cast));
+        items.add(Func.create(R.string.home_setting));
+        mFuncAdapter.setItems(items, new BaseDiffCallback<Func>());
+    }
+
+    private void getHistory() {
+        getHistory(false);
+    }
+
+    private void getHistory(boolean renew) {
+        List<History> items = History.get();
+        int historyIndex = getHistoryIndex();
+        int recommendIndex = getRecommendIndex();
+        boolean exist = recommendIndex - historyIndex == 2;
+        if (renew) mHistoryAdapter = new ArrayObjectAdapter(mPresenter = new HistoryPresenter(this));
+        if ((items.isEmpty() && exist) || (renew && exist)) mAdapter.removeItems(historyIndex, 1);
+        if ((!items.isEmpty() && !exist) || (renew && exist)) mAdapter.add(historyIndex, new ListRow(mHistoryAdapter));
+        mHistoryAdapter.setItems(items, new BaseDiffCallback<History>());
+    }
+
+    private void setHistoryDelete(boolean delete) {
+        mPresenter.setDelete(delete);
+        mHistoryAdapter.notifyArrayItemRangeChanged(0, mHistoryAdapter.size());
+    }
+
+    private void clearHistory() {
+        mAdapter.removeItems(getHistoryIndex(), 1);
+        History.delete(VodConfig.getCid());
+        mPresenter.setDelete(false);
+        mHistoryAdapter.clear();
+    }
+
+    private int getHistoryIndex() {
+        return mAdapter.indexOf(R.string.home_history) + 1;
+    }
+
+    private int getRecommendIndex() {
+        return mAdapter.indexOf(R.string.home_recommend) + 1;
+    }
+
+    private void setLogo() {
+        ImgUtil.logo(mBinding.logo);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onRefreshEvent(RefreshEvent event) {
+        switch (event.getType()) {
+            case CONFIG:
+                setFunc();
+                setLogo();
+                break;
+            case VIDEO:
+                getVideo();
+                break;
+            case HISTORY:
+                getHistory();
+                break;
+            case SIZE:
+                getVideo();
+                getHistory(true);
+                break;
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onServerEvent(ServerEvent event) {
+        switch (event.getType()) {
+            case SEARCH:
+                CollectActivity.start(this, event.getText());
+                break;
+            case PUSH:
+                VideoActivity.push(this, event.getText());
+                break;
+        }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onCastEvent(CastEvent event) {
+        if (VodConfig.get().getConfig().equals(event.getConfig())) {
+            VideoActivity.cast(this, event.getHistory().save(VodConfig.getCid()));
+        } else {
+            VodConfig.load(event.getConfig(), getCallback(event));
+        }
+    }
+
+    private Callback getCallback(CastEvent event) {
+        return new Callback() {
+            @Override
+            public void success() {
+                RefreshEvent.history();
+                RefreshEvent.config();
+                RefreshEvent.video();
+                onCastEvent(event);
+            }
+
+            @Override
+            public void error(String msg) {
+                Notify.show(msg);
+            }
+        };
+    }
+
+    @Override
+    public void onItemClick(Func item) {
+        switch (item.getResId()) {
+            case R.string.home_vod:
+                VodActivity.start(this, mResult);
+                break;
+            case R.string.home_live:
+                LiveActivity.start(this);
+                break;
+            case R.string.home_search:
+                SearchActivity.start(this);
+                break;
+            case R.string.home_keep:
+                KeepActivity.start(this);
+                break;
+            case R.string.home_push:
+                PushActivity.start(this);
+                break;
+            case R.string.home_cast:
+                CastActivity.start(this);
+                break;
+            case R.string.home_setting:
+                SettingActivity.start(this);
+                break;
+        }
+    }
+
+    @Override
+    public void onItemClick(Vod item) {
+        if (item.isAction()) mViewModel.action(getHome().getKey(), item.getAction());
+        else if (getHome().isIndex()) CollectActivity.start(this, item.getName());
+        else VideoActivity.start(this, getHome().getKey(), item.getId(), item.getName(), item.getPic());
+    }
+
+    @Override
+    public boolean onLongClick(Vod item) {
+        if (item.isAction()) return false;
+        CollectActivity.start(this, item.getName());
+        return true;
+    }
+
+    @Override
+    public void onItemClick(History item) {
+        VideoActivity.start(this, item.getSiteKey(), item.getVodId(), item.getVodName(), item.getVodPic());
+    }
+
+    @Override
+    public void onItemDelete(History item) {
+        mHistoryAdapter.remove(item.delete());
+        if (mHistoryAdapter.size() > 0) return;
+        mAdapter.removeItems(getHistoryIndex(), 1);
+        mPresenter.setDelete(false);
+    }
+
+    @Override
+    public boolean onLongClick() {
+        if (mPresenter.isDelete()) clearHistory();
+        else setHistoryDelete(true);
+        return true;
+    }
+
+    @Override
+    public void showDialog() {
+        SiteDialog.create(this).show();
+    }
+
+    @Override
+    public void onRefresh() {
+        getVideo();
+    }
+
+    @Override
+    public void setSite(Site item) {
+        VodConfig.get().setHome(item);
+        getVideo();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (KeyUtil.isMenuKey(event)) showDialog();
+        if (KeyUtil.isActionDown(event) & KeyUtil.isDownKey(event) && getCurrentFocus() == mBinding.title) return mBinding.recycler.getChildAt(0).requestFocus();
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mClock.start();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mClock.stop();
+    }
+
+    @Override
+    protected void onBackInvoked() {
+        if (mBinding.progressLayout.isProgress()) {
+            showContent();
+        } else if (mPresenter.isDelete()) {
+            setHistoryDelete(false);
+        } else if (mBinding.recycler.getSelectedPosition() != 0) {
+            mBinding.recycler.scrollToPosition(0);
+        } else {
+            if (PlaybackService.isRunning()) moveTaskToBack(true);
+            else super.onBackInvoked();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        CacheManager.get().release();
+        LiveConfig.get().clear();
+        VodConfig.get().clear();
+        AppDatabase.backup();
+        OkHttp.get().clear();
+        Source.get().exit();
+        Server.get().stop();
+        super.onDestroy();
+    }
 }
