@@ -129,29 +129,6 @@ public class LiveConfig {
         try {
             OkHttp.cancel(TAG);
             Server.get().start();
-
-            // ---------- 新增：每次启动都先检查内置的多仓地址（depot） ----------
-            try {
-                String depotUrl = UrlUtil.convert(Config.vod().getUrl());
-                String depotJson = Decoder.getJson(depotUrl, TAG);
-                JsonObject depotObj = Json.parse(depotJson).getAsJsonObject();
-                if (!depotObj.has("urls")) {
-                    App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
-                    return;
-                }
-                List<Depot> depotItems = Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
-                if (depotItems.isEmpty()) {
-                    App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
-                    return;
-                }
-            } catch (Throwable e) {
-                e.printStackTrace();
-                if (isCanceled(e)) return;
-                App.post(() -> callback.error(VodConfig.ERROR_DEPOT_INVALID));
-                return;
-            }
-            // ---------- 多仓校验通过，继续按原逻辑加载 LiveConfig ----------
-
             String json = Decoder.getJson(UrlUtil.convert(config.getUrl()), TAG);
             if (Json.isObj(json)) checkJson(id, config, callback, Json.parse(json).getAsJsonObject());
             else parseText(id, config, callback, json);

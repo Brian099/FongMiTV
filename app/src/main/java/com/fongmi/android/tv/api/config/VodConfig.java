@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.api.config;
 
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
@@ -118,26 +119,42 @@ public class VodConfig {
             OkHttp.cancel(TAG);
             Server.get().start();
 
-            // ---------- 新增：每次启动都先检查内置的多仓地址（depot） ----------
+            // ---------- 新增：每次启动都先检查内置的多仓地址（depot），并记录少量调试信息 ----------
             try {
                 String depotUrl = UrlUtil.convert(Config.vod().getUrl());
+                Log.d(TAG, "Checking depot URL: " + depotUrl);
                 String depotJson = Decoder.getJson(depotUrl, TAG);
+
+                // 把响应首部一段截取显示，避免过长
+                String preview = depotJson == null ? "" : depotJson.length() > 500 ? depotJson.substring(0, 500) + "..." : depotJson;
+                Log.d(TAG, "Depot response preview: " + preview);
+                App.post(() -> {
+                    // 在 UI 上短暂显示以便调试（可删除）
+                    Notify.show("depot ok preview: " + (preview.length() > 100 ? preview.substring(0, 100) + "..." : preview));
+                });
+
+                // 必须是 JSON 对象并包含 urls 字段且列表不为空
+                if (!Json.isObj(depotJson)) {
+                    Log.e(TAG, "Depot response is not JSON object");
+                    App.post(() -> callback.error(ERROR_DEPOT_INVALID));
+                    return;
+                }
                 JsonObject depotObj = Json.parse(depotJson).getAsJsonObject();
                 if (!depotObj.has("urls")) {
-                    // 多仓缺失 urls 字段 -> 视为授权/数据无效
+                    Log.e(TAG, "Depot JSON has no 'urls' field");
                     App.post(() -> callback.error(ERROR_DEPOT_INVALID));
                     return;
                 }
                 List<Depot> depotItems = Depot.arrayFrom(depotObj.getAsJsonArray("urls").toString());
                 if (depotItems.isEmpty()) {
-                    // 多仓没有任何子仓 -> 视为授权/数据无效
+                    Log.e(TAG, "Depot 'urls' is empty");
                     App.post(() -> callback.error(ERROR_DEPOT_INVALID));
                     return;
                 }
             } catch (Throwable e) {
                 e.printStackTrace();
+                Log.e(TAG, "Depot check failed: " + e.getMessage());
                 if (isCanceled(e)) return;
-                // 多仓不可达或解析失败，视为授权失败
                 App.post(() -> callback.error(ERROR_DEPOT_INVALID));
                 return;
             }
