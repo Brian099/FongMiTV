@@ -280,7 +280,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         if (LiveConfig.hasUrl()) items.add(Func.create(R.string.home_live));
         items.add(Func.create(R.string.home_search));
         items.add(Func.create(R.string.home_keep));
-        items.add(Func.create(R.string.home_push));
+        // items.add(Func.create(R.string.home_push));
         items.add(Func.create(R.string.home_cast));
         items.add(Func.create(R.string.home_setting));
         mFuncAdapter.setItems(items, new BaseDiffCallback<Func>());
@@ -398,9 +398,11 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
             case R.string.home_keep:
                 KeepActivity.start(this);
                 break;
+				/*
             case R.string.home_push:
                 PushActivity.start(this);
                 break;
+				*/
             case R.string.home_cast:
                 CastActivity.start(this);
                 break;

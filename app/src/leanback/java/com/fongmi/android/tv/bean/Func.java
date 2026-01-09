@@ -46,9 +46,11 @@ public class Func implements Diffable<Func> {
             case R.string.home_keep:
                 this.drawable = R.drawable.ic_home_keep;
                 break;
+				/*
             case R.string.home_push:
                 this.drawable = R.drawable.ic_home_push;
                 break;
+				*/
             case R.string.home_cast:
                 this.drawable = R.drawable.ic_home_cast;
                 break;
