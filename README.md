@@ -1,4 +1,22 @@
-# 影視
+# 影視 fork from [FongMi/TV](https://github.com/FongMi/TV)
+
+此项目基于fongMi/TV，内置了一个源，同时修改了app更新json和apk的位置，【内置源地址为：http://192.168.1.249:1666】
+
+在原项目的基础上隐藏了一部分敏感信息显示及远程推送源等功能，
+
+在原项目基础上修改了一些启动流程，当app启动时，请求服务器时附带了android_id和device_name参数，以实现服务器端根据参数进行授权管理。
+
+
+
+**app启动顺序说明：**
+
+app启动时 homeactivity.java 进行数据初始化-》decoder.java 获取远程数据并解密-》vodconfig.java 解析解密后的数据并进行数据库操作。
+
+项目中上传了接口示例 api.php，可根据此示例进行后台适配。
+
+
+
+[原项目说明]
 
 ### 基於 CatVod 項目
 

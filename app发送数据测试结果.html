@@ -1,0 +1,68 @@
+<!DOCTYPE html><html lang='zh-CN'><head>
+<meta charset='UTF-8'>
+<title>Request Log</title>
+<style>
+body { font-family: Consolas, monospace; background:#f8f9fa; color:#212529; padding:20px; }
+h2 { border-bottom:1px solid #ccc; padding-bottom:5px; margin-top:20px; justify-content:space-between; align-items:center; }
+h2 button { font-size:12px; padding:2px 6px; cursor:pointer; }
+pre {
+    background:#fff;
+    border:1px solid #ddd;
+    padding:10px;
+    border-radius:5px;
+    overflow:auto;
+    white-space: pre-wrap;      /* 保留缩进同时自动换行 */
+    word-wrap: break-word;      /* 长单词或长URL自动换行 */
+}
+</style>
+<script>
+function toggleSection(id, btn) {
+    const el = document.getElementById(id);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        btn.textContent = '折叠';
+    } else {
+        el.style.display = 'none';
+        btn.textContent = '展开';
+    }
+}
+</script>
+</head><body>
+<div style='margin-bottom:20px;'>
+    <a href='?latest' style='background:#007bff; color:white; padding:8px 15px; text-decoration:none; border-radius:4px;'>查看最新日志</a>
+</div>
+<h2>Client Information <button onclick="toggleSection('clientInfo', this)">折叠</button></h2>
+    <pre id="clientInfo">IP Address: 192.168.1.148
+Port: 38486
+User Agent: okhttp/5.3.2
+</pre>
+<h2>Request Information <button onclick="toggleSection('requestInfo', this)">折叠</button></h2>
+    <pre id="requestInfo">Request Method: GET
+Request URI: /tvbox/api.php?android_id=71b12347e7f85327&amp;device_name=Samsung%20SM-S9280
+Query String: android_id=71b12347e7f85327&amp;device_name=Samsung%20SM-S9280
+</pre>
+<h2>Headers <button onclick="toggleSection('headers', this)">折叠</button></h2>
+    <pre id="headers">User-Agent: okhttp/5.3.2
+Accept-Encoding: gzip
+Connection: Keep-Alive
+Host: 192.168.1.249:1666
+</pre>
+<h2>Server Information <button onclick="toggleSection('serverInfo', this)">折叠</button></h2>
+    <pre id="serverInfo">Server Name: _
+Server Software: nginx/1.16.1
+Server Protocol: HTTP/1.1
+Server Port: 1666
+Document Root: /volume1/web/tools
+</pre>
+<h2>GET Parameters <button onclick="toggleSection('getParams', this)">折叠</button></h2>
+    <pre id="getParams">Array
+(
+    [android_id] =&gt; 71b12347e7f85327
+    [device_name] =&gt; Samsung SM-S9280
+)
+</pre>
+<h2>POST Parameters <button onclick="toggleSection('postParams', this)">折叠</button></h2>
+    <pre id="postParams">No POST parameters.</pre>
+<h2>Uploaded Files <button onclick="toggleSection('filesInfo', this)">折叠</button></h2>
+    <pre id="filesInfo">No files uploaded.</pre>
+</body></html>
