@@ -26,9 +26,9 @@ public class Decoder {
 
 		HttpUrl.Builder builder = httpUrl.newBuilder();
 
-		if (httpUrl.queryParameter("android_id") == null) {
+		if (httpUrl.queryParameter("device_id") == null) {
 			builder.addQueryParameter(
-				"android_id",
+				"device_id",
 				com.fongmi.android.tv.utils.Util.getAndroidId()
 			);
 		}
