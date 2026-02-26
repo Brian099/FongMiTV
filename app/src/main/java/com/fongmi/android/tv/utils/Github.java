@@ -6,7 +6,7 @@ public class Github {
     public static final String URL = "http://192.168.1.249:1666";
 
     private static String getUrl(String name) {
-        return URL + "/apk/" + name;
+        return URL + "/APKs/" + name;
     }
 
     public static String getJson(String name) {

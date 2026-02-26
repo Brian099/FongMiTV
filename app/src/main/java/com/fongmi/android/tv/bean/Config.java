@@ -86,7 +86,7 @@ public class Config {
 
     public String getUrl() {
         String baseUrl = "http://192.168.1.249:1666";
-        String apiPath = "/tvbox/api.php";
+        String apiPath = "/api.php";
         return TextUtils.isEmpty(url) ? baseUrl + apiPath : url;
     }
 
